@@ -1,0 +1,1 @@
+{"seed": 2024, "r": [3.3, 3.2, 3.6], "c": 3.8, "q": 1.7, "sample_args": {"type": "pareto", "params": [1.89, 2.1, 2.2]}, "B_list": [200], "k_list": [0.1, 0.2, 10], "B12_list": [[20, 200], [40, 200], [20, 400]], "epsilon": 0.01, "number_of_iterations": 50, "sample_number": [128, 256, 512, 1024, 2048, 4096], "large_number_sample": 200000, "eval_time": 10}
