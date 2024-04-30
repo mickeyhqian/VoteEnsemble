@@ -24,7 +24,7 @@ def plot_params(SAA_obj_avg, bagging_obj_avg, sample_number, B_list, k_list, nam
 
 def find_parameters(s, p, c, g, B_list, k_list, number_of_iterations,sample_number, large_number_sample, rng):
     # currently only supports len(B_list) = 1 and len(k_list) = 1
-    for iter in range(200):
+    for iter in range(400):
         C = np.random.rand(p)
         # Q_sp = np.random.rand(s, p, g)
         # Q_pc = np.random.rand(p, c, g)
