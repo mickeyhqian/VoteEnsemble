@@ -21,3 +21,24 @@ def genSample_SSKP(n, rng, **kwargs):
      else:
           raise ValueError('Invalid type')
      return np.vstack(arrays_list).T 
+
+
+def genSample_portfolio(n, rng, **kwargs):
+     # currently only consider uncorrelated samples
+     if kwargs['type'] == 'pareto' or kwargs['type'] == 'normal':
+          return genSample_SSKP(n, rng, type=kwargs['type'], params=kwargs['params'])
+     elif kwargs['type'] == 'sym_pareto':
+          # generate symmetric pareto distributed samples with mean specified by kwargs['params']
+          paretoShapes = kwargs['params']
+          pos_sample = genSample_SSKP(n, rng, type='pareto', params=paretoShapes)
+          neg_sample = -genSample_SSKP(n, rng, type='pareto', params=paretoShapes)
+          return pos_sample + neg_sample + np.array(paretoShapes)
+     else:
+          raise ValueError('Invalid type')
+
+def genSample_network(n, rng, **kwargs):
+     # simply assume that the samples are Pareto distributed
+     s, c, g = kwargs['size']
+     sample_S = genPareto((n,s,g), rng, kwargs['params'][0])
+     sample_D = genPareto((n,c,g), rng, kwargs['params'][1])
+     return np.concatenate((sample_S, sample_D), axis = 1)

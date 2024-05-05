@@ -1,23 +1,11 @@
 import time
 import json
 import numpy as np
-from utils.matching_functions import comparison_twoPhase, evaluation_twoPhase, matching_obj_optimal
+from utils.matching_functions import comparison_twoPhase, evaluation_twoPhase, matching_obj_optimal, generateW
 from utils.plotting import plot_twoPhase, plot_CI_twoPhase, plot_optGap_twoPhase
 
 
-def generateW(N):
-    # this script is also used to find good parameters
-    # using 1-based index
-    w = {}
-    for i in range(1, N):
-        for j in range(i+1, N+1):
-            if i <= 3 and j <= 4:
-                w[(i,j)] = None # place holder
-            elif N >= 8 and i >= N-3 and j >= N-2:
-                w[(i,j)] = 2 # fixed weight
-            else:
-                w[(i,j)] = np.random.uniform(1.5, 2.5)
-    return w
+
 
 if __name__ == "__main__":
     seed = 2024
@@ -51,17 +39,17 @@ if __name__ == "__main__":
     #     (6, 8): 2,
     #     (7, 8): 2}
 
-    w = generateW(N)
+    w = generateW(N,"random")
     sample_args = {
         "type" : "pareto",
         # "params": [2,2,2,2,2,2]
-        "params": np.random.uniform(1.9,2.1,6).tolist()
+        "params": np.random.uniform(1.95,2.05,6).tolist()
     }
     rng_sample = np.random.default_rng(seed=seed)
     rng_alg = np.random.default_rng(seed=seed*2)
 
     B_list = [200]
-    k_list = [0.1, 2, 50]
+    k_list = [0.1, 10]
     B12_list = [(20,200)]
     epsilon = "dynamic"
     tolerance = 0.005

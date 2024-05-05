@@ -213,11 +213,11 @@ def comparison_twoPhase(B_list, k_list, B12_list, epsilon, tolerance, number_of_
                 for ind2, k in enumerate(k_list):
                     tic = time.time()
                     if k < 1:
-                        bagging_alg3, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_SSKP, SSKP_eval_wSol, rng_alg, *prob_args)
-                        bagging_alg4, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_SSKP, SSKP_eval_wSol, rng_alg, *prob_args)
+                        bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_SSKP, SSKP_eval_wSol, rng_alg, *prob_args)
+                        bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_SSKP, SSKP_eval_wSol, rng_alg, *prob_args)
                     else:
-                        bagging_alg3, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_SSKP, SSKP_eval_wSol, rng_alg, *prob_args)
-                        bagging_alg4, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_SSKP, SSKP_eval_wSol, rng_alg, *prob_args)
+                        bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_SSKP, SSKP_eval_wSol, rng_alg, *prob_args)
+                        bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_SSKP, SSKP_eval_wSol, rng_alg, *prob_args)
                     bagging_alg3_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging_alg3]))
                     bagging_alg4_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging_alg4]))
                     print(f"Sample size {n}, iteration {iter}, B1={B1}, B2={B2}, k={k}, Bagging Alg 3 & 4time: {time.time()-tic}")
@@ -252,7 +252,6 @@ def evaluation_twoPhase(SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_
                     all_solutions.add(bagging_alg3_list[ind1][ind2][i][j])
                     all_solutions.add(bagging_alg4_list[ind1][ind2][i][j])
     
-
     solution_obj_values = evaluation_process(all_solutions, large_number_sample, eval_time, rng_sample, sample_args, *prob_args)
 
     SAA_obj_list, SAA_obj_avg = [], []

@@ -107,7 +107,6 @@ def baggingPhaseII(sample_n, retrieved_solutions, B2, k, epsilon, eval_func, rng
 
 def baggingPhaseII_epsilonDynamic(sample_n, retrieved_solutions, B2, k, tolerance, eval_func, rng, *prob_args):
     # implement the strategy of dynamic epsilon, use the bisection method to find the proper epsilon value
-    
     # boundary case: epsilon = 0
     x_max, x_count = baggingPhaseII(sample_n, retrieved_solutions, B2, k, 0, eval_func, rng, *prob_args)
     if x_count[x_max] >= B2/2:
@@ -136,15 +135,16 @@ def baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, opt_func, e
     _, retrieved_solutions = majority_vote(sample_n, B1, k, opt_func, rng, *prob_args)
 
     if len(retrieved_solutions) == 1:
-        return retrieved_solutions[0], {retrieved_solutions[0]: B2}, retrieved_solutions
+        return retrieved_solutions[0], {retrieved_solutions[0]: B2}, retrieved_solutions, 0
     elif type(epsilon) is not str:
         x_max, x_count = baggingPhaseII(sample_n, retrieved_solutions, B2, k, epsilon, eval_func, rng, *prob_args)
     elif len(retrieved_solutions) == 2: # epsilon == "dynamic" and only two solutions
         x_max, x_count = baggingPhaseII(sample_n, retrieved_solutions, B2, k, 0, eval_func, rng, *prob_args)
+        epsilon = 0
     else: # epsilon == "dynamic" and more than two solutions
-        x_max, x_count, _ = baggingPhaseII_epsilonDynamic(sample_n, retrieved_solutions, B2, k, tolerance, eval_func, rng, *prob_args)
+        x_max, x_count, epsilon = baggingPhaseII_epsilonDynamic(sample_n, retrieved_solutions, B2, k, tolerance, eval_func, rng, *prob_args)
         
-    return x_max, x_count, retrieved_solutions
+    return x_max, x_count, retrieved_solutions, epsilon
     
 
 def baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, opt_func, eval_func, rng, *prob_args):
@@ -155,7 +155,7 @@ def baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, opt_func, ev
     _, retrieved_solutions = majority_vote(sample_n1, B1, k, opt_func, rng, *prob_args)
     
     if len(retrieved_solutions) == 1:
-        return retrieved_solutions[0], {retrieved_solutions[0]: B2}, retrieved_solutions
+        return retrieved_solutions[0], {retrieved_solutions[0]: B2}, retrieved_solutions, 0
     elif type(epsilon) is not str:
         eps = epsilon
     elif len(retrieved_solutions) == 2: # epsilon == "dynamic" and only two solutions
@@ -164,7 +164,7 @@ def baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, opt_func, ev
         _, _, eps = baggingPhaseII_epsilonDynamic(sample_n1, retrieved_solutions, B2, k, tolerance, eval_func, rng, *prob_args)
         
     x_max, x_count = baggingPhaseII(sample_n2, retrieved_solutions, B2, k, eps, eval_func, rng, *prob_args)
-    return x_max, x_count, retrieved_solutions
+    return x_max, x_count, retrieved_solutions, eps
 
 
 ############# Maximum weight matching #############
@@ -275,7 +275,7 @@ def gurobi_SSKP(sample_k, r, c, q):
         return None
     
 ############# Portfolio #############
-def gurobi_portfolio(sample_xi, p, mu, b):
+def gurobi_portfolio(sample_xi, p, mu, b, alpha):
     # input:
     # sample_xi(random returns): k*m numpy array (where m is number of assets)
     # p(price): m*1 numpy array
@@ -284,25 +284,29 @@ def gurobi_portfolio(sample_xi, p, mu, b):
     # output:
     # x(number of shares for each asset): m*1 numpy array
 
+    # for consistency, use the maximization form
+
     k, m = sample_xi.shape
     model = Model("portfolio")
     model.setParam(GRB.Param.OutputFlag, 0)
     model.setParam('MIPGap', 0.00001)
     x = model.addVars(m, lb=0, vtype=GRB.INTEGER, name="x")
-    c = model.addVar(vtype=GRB.CONTINUOUS, name="c")
+    c = model.addVar(lb=-float("inf"), vtype=GRB.CONTINUOUS, name="c")
     z = model.addVars(k, lb=0, vtype=GRB.CONTINUOUS, name="z")
     
-    model.setObjective(c + 1/0.05 * 1/k * quicksum(z[i] for i in range(k)), GRB.MINIMIZE)
+    # model.setObjective(c + 1/(1-alpha) * 1/k * quicksum(z[i] for i in range(k)), GRB.MINIMIZE)
+    model.setObjective(-c - 1/(1-alpha) * 1/k * quicksum(z[i] for i in range(k)), GRB.MAXIMIZE)
     
     model.addConstrs(z[i] >= -sum(sample_xi[i, j] * x[j] * p[j] for j in range(m)) - c for i in range(k))
     model.addConstr(quicksum(mu[j] * x[j] * p[j] for j in range(m)) >= 1.5*b)
     model.addConstr(quicksum(x[j] * p[j] for j in range(m)) <= b)
-    model.setParam("Threads", 3)
+    model.setParam("Threads", 1)
 
     model.optimize()
 
     if model.status == GRB.OPTIMAL:
         x_opt = np.array([round(x[j].X) for j in range(m)])
+        # objVal = model.ObjVal
         return x_opt
     else:
         print("No optimal solution found.")
@@ -310,13 +314,13 @@ def gurobi_portfolio(sample_xi, p, mu, b):
 
 
 ############# Network #############
-def gurobi_network_first_stage(sample_S, sample_D, C, Q_sp, Q_pc, R, M, H):
+def gurobi_network_first_stage(sample_k, s, C,Q_sp, Q_pc, R, M, H):
     # input:
     # C (unit cost for building a facility): p*1 numpy array
     # Q_sp (unit flow cost): s*p*g numpy array
     # Q_pc (unit flow cost): p*c*g numpy array
-    # sample_S (supply): s*g*k numpy array
-    # sample_D (demand): c*g*k numpy array
+    # sample_S (supply): k*s*g numpy array
+    # sample_D (demand): k*c*g numpy array
     # R (unit processing require): p*g numpy array
     # M (processing capacity): p*1 numpy array
     # H (multiplier): c*g numpy array
@@ -325,8 +329,10 @@ def gurobi_network_first_stage(sample_S, sample_D, C, Q_sp, Q_pc, R, M, H):
     # y_sp (flow supplier --> facility): s*p*g*k numpy array 
     # y_pc (flow facility --> consumer): p*c*g*k numpy array
     # z (multiplier): c*g*k numpy array
-    s, p, g = Q_sp.shape
-    c, g, k = sample_D.shape
+    sample_S = sample_k[:,:s,:]
+    sample_D = sample_k[:,s:,:]
+    _, p, g = Q_sp.shape
+    k, c, _ = sample_D.shape
     model = Model("network")
     model.setParam(GRB.Param.OutputFlag, 0)
     x = model.addVars(p, vtype=GRB.BINARY, name="x")
@@ -344,10 +350,10 @@ def gurobi_network_first_stage(sample_S, sample_D, C, Q_sp, Q_pc, R, M, H):
     model.addConstrs((quicksum(y_sp[i, j, l, a] for i in range(s)) - quicksum(y_pc[j, i, l, a] for i in range(c)) == 0 
                       for a in range(k) for l in range(g) for j in range(p)), name="flow")
     
-    model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(p)) >= sample_D[i, l, a]
+    model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(p)) >= sample_D[a, i, l]
                       for a in range(k) for l in range(g) for i in range(c)), name="demand")
     
-    model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(p)) <= sample_S[i, l, a]
+    model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(p)) <= sample_S[a, i, l]
                       for a in range(k) for l in range(g) for i in range(s)), name="supply")
     
     model.addConstrs((quicksum(R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(s)) for l in range(g)) <= M[j] * x[j]
@@ -367,85 +373,167 @@ def gurobi_network_first_stage(sample_S, sample_D, C, Q_sp, Q_pc, R, M, H):
         print("No optimal solution found.")
         return None
 
-############# Algorithm function for Network #############
-def sequentialSolve_network(eval_func, queue: Queue, sampleList, *eval_args):
-    for sample in sampleList:
-        queue.put(eval_func(sample[0],sample[1], *eval_args))
 
-def majority_vote_network(sample_S, sample_D, B, k, eval_func, rng, *eval_args):
-    x_count = {}
-    numProcesses = 9
-    sampleLists = [[] for _ in range(numProcesses)] # contain both sample_S and sample_D
-    processIndex = 0
-    for _ in range(B):
-        sampleLists[processIndex].append(
-            [sample_S[:,:,rng.choice(sample_S.shape[2], k, replace=False)], 
-             sample_D[:,:,rng.choice(sample_D.shape[2], k, replace=False)]]
-             )
-        processIndex += 1
-        if processIndex >= numProcesses:
-            processIndex = 0
 
-    processList: list[Process] = []
-    queue = Queue()
-    for i in range(numProcesses):
-        if len(sampleLists[i]) > 0:
-            processList.append(Process(target=sequentialSolve_network, args=(eval_func, queue, sampleLists[i], *eval_args), daemon = True))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def gurobi_network_first_stage(sample_S, sample_D, C, Q_sp, Q_pc, R, M, H):
+#     # input:
+#     # C (unit cost for building a facility): p*1 numpy array
+#     # Q_sp (unit flow cost): s*p*g numpy array
+#     # Q_pc (unit flow cost): p*c*g numpy array
+#     # sample_S (supply): s*g*k numpy array
+#     # sample_D (demand): c*g*k numpy array
+#     # R (unit processing require): p*g numpy array
+#     # M (processing capacity): p*1 numpy array
+#     # H (multiplier): c*g numpy array
+#     # output:
+#     # x (open facility): p*1 numpy array
+#     # y_sp (flow supplier --> facility): s*p*g*k numpy array 
+#     # y_pc (flow facility --> consumer): p*c*g*k numpy array
+#     # z (multiplier): c*g*k numpy array
+#     s, p, g = Q_sp.shape
+#     c, g, k = sample_D.shape
+#     model = Model("network")
+#     model.setParam(GRB.Param.OutputFlag, 0)
+#     x = model.addVars(p, vtype=GRB.BINARY, name="x")
+#     y_sp = model.addVars(s, p, g, k, lb=0, vtype=GRB.CONTINUOUS, name="y_sp")
+#     y_pc = model.addVars(p, c, g, k, lb=0, vtype=GRB.CONTINUOUS, name="y_pc")
+#     z = model.addVars(c, g, k, lb=0, vtype=GRB.CONTINUOUS, name="z")
+
+#     obj_expr = quicksum(C[j] * x[j] for j in range(p)) \
+#                        + 1/k * quicksum(Q_sp[i, j, l] * y_sp[i, j, l, a] for i in range(s) for j in range(p) for l in range(g) for a in range(k))\
+#                         + 1/k * quicksum(Q_pc[j, i, l] * y_pc[j, i, l, a] for j in range(p) for i in range(c) for l in range(g) for a in range(k))\
+#                             + 1/k * quicksum(H[i, l] * z[i, l, a] for i in range(c) for l in range(g) for a in range(k))
     
-    for process in processList:
-        process.start()
+#     model.setObjective(obj_expr, GRB.MINIMIZE)
 
-    for _ in range(B):
-        x_k = queue.get()
-        if x_k is not None:
-            sol = tuple(int(entry) for entry in x_k)
-            x_count[sol] = x_count.get(sol, 0) + 1
-
-    for process in processList:
-        process.join()
+#     model.addConstrs((quicksum(y_sp[i, j, l, a] for i in range(s)) - quicksum(y_pc[j, i, l, a] for i in range(c)) == 0 
+#                       for a in range(k) for l in range(g) for j in range(p)), name="flow")
     
-    x_max = max(x_count, key=x_count.get)
-    return x_max
+#     model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(p)) >= sample_D[i, l, a]
+#                       for a in range(k) for l in range(g) for i in range(c)), name="demand")
+    
+#     model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(p)) <= sample_S[i, l, a]
+#                       for a in range(k) for l in range(g) for i in range(s)), name="supply")
+    
+#     model.addConstrs((quicksum(R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(s)) for l in range(g)) <= M[j] * x[j]
+#                       for a in range(k) for j in range(p)), name="capacity")
+
+#     model.setParam("Threads", 1)
+#     model.optimize()
+
+#     if model.status == GRB.OPTIMAL:
+#         # only return the discrete variable x
+#         x_opt = np.array([round(x[i].X) for i in range(p)])
+#         # y_sp_opt = np.array([[[[y_sp[i, j, l, a].X for a in range(k)] for l in range(g)] for j in range(p)] for i in range(s)])
+#         # y_pc_opt = np.array([[[[y_pc[j, i, l, a].X for a in range(k)] for l in range(g)] for j in range(p)] for i in range(c)])
+#         # z_opt = np.array([[[z[i, l, a].X for a in range(k)] for l in range(g)] for i in range(c)])
+#         return x_opt #, y_sp_opt, y_pc_opt, z_opt
+#     else:
+#         print("No optimal solution found.")
+#         return None
+
+# ############# Algorithm function for Network #############
+# def sequentialSolve_network(eval_func, queue: Queue, sampleList, *eval_args):
+#     for sample in sampleList:
+#         queue.put(eval_func(sample[0],sample[1], *eval_args))
+
+# def majority_vote_network(sample_S, sample_D, B, k, eval_func, rng, *eval_args):
+#     x_count = {}
+#     numProcesses = 9
+#     sampleLists = [[] for _ in range(numProcesses)] # contain both sample_S and sample_D
+#     processIndex = 0
+#     for _ in range(B):
+#         sampleLists[processIndex].append(
+#             [sample_S[:,:,rng.choice(sample_S.shape[2], k, replace=False)], 
+#              sample_D[:,:,rng.choice(sample_D.shape[2], k, replace=False)]]
+#              )
+#         processIndex += 1
+#         if processIndex >= numProcesses:
+#             processIndex = 0
+
+#     processList: list[Process] = []
+#     queue = Queue()
+#     for i in range(numProcesses):
+#         if len(sampleLists[i]) > 0:
+#             processList.append(Process(target=sequentialSolve_network, args=(eval_func, queue, sampleLists[i], *eval_args), daemon = True))
+    
+#     for process in processList:
+#         process.start()
+
+#     for _ in range(B):
+#         x_k = queue.get()
+#         if x_k is not None:
+#             sol = tuple(int(entry) for entry in x_k)
+#             x_count[sol] = x_count.get(sol, 0) + 1
+
+#     for process in processList:
+#         process.join()
+    
+#     x_max = max(x_count, key=x_count.get)
+#     return x_max
 
 
-def gurobi_second_stage_wSol(sample, x, C, Q_sp, Q_pc, R, M, H):
-    # second stage LP problem
-    tic = time.time()
-    sample_S, sample_D = sample[0], sample[1]
-    s, p, g = Q_sp.shape
-    c, g, n = sample_D.shape
-    model = Model("second_stage")
-    model.setParam(GRB.Param.OutputFlag, 0)
-    y_sp = model.addVars(s, p, g, n, lb=0, vtype=GRB.CONTINUOUS, name="y_sp")
-    y_pc = model.addVars(p, c, g, n, lb=0, vtype=GRB.CONTINUOUS, name="y_pc")
-    z = model.addVars(c, g, n, lb=0, vtype=GRB.CONTINUOUS, name="z")
+# def gurobi_second_stage_wSol(sample, x, C, Q_sp, Q_pc, R, M, H):
+#     # second stage LP problem
+#     tic = time.time()
+#     sample_S, sample_D = sample[0], sample[1]
+#     s, p, g = Q_sp.shape
+#     c, g, n = sample_D.shape
+#     model = Model("second_stage")
+#     model.setParam(GRB.Param.OutputFlag, 0)
+#     y_sp = model.addVars(s, p, g, n, lb=0, vtype=GRB.CONTINUOUS, name="y_sp")
+#     y_pc = model.addVars(p, c, g, n, lb=0, vtype=GRB.CONTINUOUS, name="y_pc")
+#     z = model.addVars(c, g, n, lb=0, vtype=GRB.CONTINUOUS, name="z")
 
-    obj_expr = 1/n * quicksum(Q_sp[i, j, l] * y_sp[i, j, l, a] for i in range(s) for j in range(p) for l in range(g) for a in range(n))\
-                        + 1/n * quicksum(Q_pc[j, i, l] * y_pc[j, i, l, a] for j in range(p) for i in range(c) for l in range(g) for a in range(n))\
-                            + 1/n * quicksum(H[i, l] * z[i, l, a] for i in range(c) for l in range(g) for a in range(n))
+#     obj_expr = 1/n * quicksum(Q_sp[i, j, l] * y_sp[i, j, l, a] for i in range(s) for j in range(p) for l in range(g) for a in range(n))\
+#                         + 1/n * quicksum(Q_pc[j, i, l] * y_pc[j, i, l, a] for j in range(p) for i in range(c) for l in range(g) for a in range(n))\
+#                             + 1/n * quicksum(H[i, l] * z[i, l, a] for i in range(c) for l in range(g) for a in range(n))
     
-    model.setObjective(obj_expr, GRB.MINIMIZE)
+#     model.setObjective(obj_expr, GRB.MINIMIZE)
 
-    model.addConstrs((quicksum(y_sp[i, j, l, a] for i in range(s)) - quicksum(y_pc[j, i, l, a] for i in range(c)) == 0
-                        for a in range(n) for l in range(g) for j in range(p)), name="flow")
+#     model.addConstrs((quicksum(y_sp[i, j, l, a] for i in range(s)) - quicksum(y_pc[j, i, l, a] for i in range(c)) == 0
+#                         for a in range(n) for l in range(g) for j in range(p)), name="flow")
     
-    model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(p)) >= sample_D[i, l, a]
-                        for a in range(n) for l in range(g) for i in range(c)), name="demand")
+#     model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(p)) >= sample_D[i, l, a]
+#                         for a in range(n) for l in range(g) for i in range(c)), name="demand")
     
-    model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(p)) <= sample_S[i, l, a]
-                        for a in range(n) for l in range(g) for i in range(s)), name="supply")
+#     model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(p)) <= sample_S[i, l, a]
+#                         for a in range(n) for l in range(g) for i in range(s)), name="supply")
     
-    model.addConstrs((quicksum(R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(s)) for l in range(g)) <= M[j] * x[j]
-                        for a in range(n) for j in range(p)), name="capacity")
+#     model.addConstrs((quicksum(R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(s)) for l in range(g)) <= M[j] * x[j]
+#                         for a in range(n) for j in range(p)), name="capacity")
     
-    model.setParam("Threads", 9)
-    model.optimize()
+#     model.setParam("Threads", 9)
+#     model.optimize()
 
-    if model.status == GRB.OPTIMAL:
-        print(f"Time elapsed: {time.time()-tic}")
-        return model.ObjVal + sum(C[j] * x[j] for j in range(p)), x
-    else:
-        print("No optimal solution found.")
-        return None
+#     if model.status == GRB.OPTIMAL:
+#         print(f"Time elapsed: {time.time()-tic}")
+#         return model.ObjVal + sum(C[j] * x[j] for j in range(p)), x
+#     else:
+#         print("No optimal solution found.")
+#         return None
 
 

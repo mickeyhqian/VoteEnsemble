@@ -45,9 +45,9 @@ if __name__ == "__main__":
     rng_sample = np.random.default_rng(seed=seed)
     rng_alg = np.random.default_rng(seed=seed*2)
 
-    B_list = [200]
+    B_list = [200, 400]
     k_list = [0.1, 2, 10]
-    B12_list = [(20,200)]
+    B12_list = [(20,200), (20,400)]
     epsilon = "dynamic"
     tolerance = 0.005
     number_of_iterations = 200

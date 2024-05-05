@@ -4,6 +4,26 @@ from utils.generateSamples import genSample_SSKP
 from ParallelSolve import majority_vote, baggingTwoPhase_woSplit, baggingTwoPhase_wSplit, gurobi_matching
 from ParallelSolve import gurobi_matching
 
+def generateW(N, option = None):
+    # this script is also used to find good parameters
+    # using 1-based index
+    w = {}
+    for i in range(1, N):
+        for j in range(i+1, N+1):
+            if i <= 3 and j <= 4:
+                w[(i,j)] = None # place holder
+            elif N >= 8 and i >= N-3 and j >= N-2:
+                if option == "random":
+                    w[(i,j)] = np.random.uniform(1.95, 2.05)
+                else:
+                    w[(i,j)] = 2 # fixed weight
+            else:
+                if option == "random":
+                    w[(i,j)] = np.random.uniform(1.95, 2.05)
+                else:
+                    w[(i,j)] = np.random.uniform(1.5, 2.5)
+    return w
+
 def matching_obj_optimal(sample_args, N, w):
     # computes the optimal objective value
     sample_mean = np.reshape([item/(item-1) for item in sample_args['params']], (1, len(sample_args['params'])))
@@ -82,11 +102,11 @@ def comparison_twoPhase(B_list, k_list, B12_list, epsilon, tolerance, number_of_
                 for ind2, k in enumerate(k_list):
                     tic = time.time()
                     if k < 1:
-                        bagging_alg3, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
-                        bagging_alg4, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                        bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                        bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
                     else:
-                        bagging_alg3, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
-                        bagging_alg4, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                        bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                        bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
                     bagging_alg3_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging_alg3]))
                     bagging_alg4_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging_alg4]))
                     print(f"Sample size {n}, iteration {iter}, B1={B1}, B2={B2}, k={k}, Bagging Alg 3 & 4time: {time.time()-tic}")
@@ -233,11 +253,11 @@ def matching_prob_comparison(B_list, k_list, B12_list, epsilon, tolerance, numbe
                 
                 for B1, B2 in B12_list:
                     if k < 1:
-                        baggingAlg3, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
-                        baggingAlg4, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                        baggingAlg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                        baggingAlg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
                     else:
-                        baggingAlg3, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
-                        baggingAlg4, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                        baggingAlg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                        baggingAlg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
                     
                     if baggingAlg3 in opt_set:
                         baggingAlg3_count[str((B1,B2,k))]['opt'] = baggingAlg3_count[str((B1,B2,k))].get('opt', 0) + 1/number_of_iterations
@@ -287,3 +307,113 @@ def matching_prob_comparison(B_list, k_list, B12_list, epsilon, tolerance, numbe
                         
             
 
+def comparison_epsilon(B, k, B12, epsilon_list, tolerance, number_of_iterations, sample_number, rng_sample, rng_alg, sample_args, *prob_args):
+    # function that performs grid-search on the values of epsilon. Only consider one possible value for B, k, and B12.
+    SAA_list = []
+    bagging_alg1_list = []
+    bagging_alg3_list = [[] for _ in range(len(epsilon_list))]
+    bagging_alg4_list = [[] for _ in range(len(epsilon_list))]
+    # use lists to store the dynamic epsilon values, each entry corresponds to the list of epsilon values for a given sample size
+    # under a bunch of repeated experiments
+    dyn_eps_alg3_list = []
+    dyn_eps_alg4_list = []
+
+    for n in sample_number:
+        SAA_intermediate = []
+        bagging_alg1_intermediate = []
+        bagging_alg3_intermediate = [[] for _ in range(len(epsilon_list))]
+        bagging_alg4_intermediate = [[] for _ in range(len(epsilon_list))]
+        dyn_eps_alg3_intermediate = []
+        dyn_eps_alg4_intermediate = []
+        for iter in range(number_of_iterations):
+            tic0 = time.time()
+            sample_n = genSample_SSKP(n, rng_sample, type = sample_args['type'], params = sample_args['params'])
+            SAA, _ = majority_vote(sample_n, 1, n, gurobi_matching, rng_alg, *prob_args)
+            SAA_intermediate.append(tuple([round(x) for x in SAA]))
+            print(f"Sample size {n}, iteration {iter}, SAA time: {time.time()-tic0}")
+
+            tic = time.time()
+            if k < 1:
+                bagging, _ = majority_vote(sample_n, B, int(n*k), gurobi_matching, rng_alg, *prob_args)
+            else:
+                bagging, _ = majority_vote(sample_n, B, k, gurobi_matching, rng_alg, *prob_args)
+            bagging_alg1_intermediate.append(tuple([round(x) for x in bagging]))
+            print(f"Sample size {n}, iteration {iter}, B={B}, k={k}, Bagging Alg 1 time: {time.time()-tic}")
+
+            for ind, epsilon in enumerate(epsilon_list):
+                tic = time.time()
+                if k < 1:
+                    bagging_alg3, _, _, eps_alg3 = baggingTwoPhase_woSplit(sample_n, B12[0], B12[1], int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                    bagging_alg4, _, _, eps_alg4 = baggingTwoPhase_wSplit(sample_n, B12[0], B12[1], int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                else:
+                    bagging_alg3, _, _, eps_alg3 = baggingTwoPhase_woSplit(sample_n, B12[0], B12[1], k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                    bagging_alg4, _, _, eps_alg4 = baggingTwoPhase_wSplit(sample_n, B12[0], B12[1], k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                bagging_alg3_intermediate[ind].append(tuple([round(x) for x in bagging_alg3]))
+                bagging_alg4_intermediate[ind].append(tuple([round(x) for x in bagging_alg4]))
+                if epsilon == "dynamic":
+                    dyn_eps_alg3_intermediate.append(eps_alg3)
+                    dyn_eps_alg4_intermediate.append(eps_alg4)
+                print(f"Sample size {n}, iteration {iter}, B1={B12[0]}, B2={B12[1]}, epsilon={epsilon}, Bagging Alg 3 & 4 time: {time.time()-tic}")
+            
+            print(f"Sample size {n}, iteration {iter}, total time: {time.time()-tic0}")
+            
+        SAA_list.append(SAA_intermediate)
+        bagging_alg1_list.append(bagging_alg1_intermediate)
+        dyn_eps_alg3_list.append(dyn_eps_alg3_intermediate)
+        dyn_eps_alg4_list.append(dyn_eps_alg4_intermediate)
+        for ind in range(len(epsilon_list)):
+            bagging_alg3_list[ind].append(bagging_alg3_intermediate[ind])
+            bagging_alg4_list[ind].append(bagging_alg4_intermediate[ind])
+
+    return SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_alg4_list, dyn_eps_alg3_list, dyn_eps_alg4_list
+
+def evaluation_epsilon(SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_alg4_list, sample_args, *prob_args):
+    # evaluation function for the epsilon comparison
+    sample_number_len = len(SAA_list)
+    number_of_iteration = len(SAA_list[0])
+    epsilon_list_len = len(bagging_alg3_list)
+    all_solutions = set()
+    for i in range(sample_number_len):
+        for j in range(number_of_iteration):
+            all_solutions.add(SAA_list[i][j])
+            all_solutions.add(bagging_alg1_list[i][j])
+            for ind in range(epsilon_list_len):
+                all_solutions.add(bagging_alg3_list[ind][i][j])
+                all_solutions.add(bagging_alg4_list[ind][i][j])
+    
+    solution_obj_values = {}
+    for solution in all_solutions:
+        solution_obj_values[str(solution)] = matching_evaluate_exact(sample_args, solution, *prob_args)
+    
+    SAA_obj_list, SAA_obj_avg = [], []
+    bagging_alg1_obj_list, bagging_alg1_obj_avg = [], []
+    bagging_alg3_obj_list, bagging_alg3_obj_avg = [[] for _ in range(epsilon_list_len)], [[] for _ in range(epsilon_list_len)]
+    bagging_alg4_obj_list, bagging_alg4_obj_avg = [[] for _ in range(epsilon_list_len)], [[] for _ in range(epsilon_list_len)]
+    for i in range(sample_number_len):
+        current_SAA_obj_list = []
+        current_bagging_alg1_obj_list = []
+        for j in range(number_of_iteration):
+            SAA_obj = solution_obj_values[str(SAA_list[i][j])]
+            current_SAA_obj_list.append(SAA_obj)
+            bagging_alg1_obj = solution_obj_values[str(bagging_alg1_list[i][j])]
+            current_bagging_alg1_obj_list.append(bagging_alg1_obj)
+        SAA_obj_list.append(current_SAA_obj_list)
+        SAA_obj_avg.append(np.mean(current_SAA_obj_list))
+        bagging_alg1_obj_list.append(current_bagging_alg1_obj_list)
+        bagging_alg1_obj_avg.append(np.mean(current_bagging_alg1_obj_list))
+    
+    for ind in range(epsilon_list_len):
+        for i in range(sample_number_len):
+            current_bagging_alg3_obj_list = []
+            current_bagging_alg4_obj_list = []
+            for j in range(number_of_iteration):
+                bagging_alg3_obj = solution_obj_values[str(bagging_alg3_list[ind][i][j])]
+                current_bagging_alg3_obj_list.append(bagging_alg3_obj)
+                bagging_alg4_obj = solution_obj_values[str(bagging_alg4_list[ind][i][j])]
+                current_bagging_alg4_obj_list.append(bagging_alg4_obj)
+            bagging_alg3_obj_list[ind].append(current_bagging_alg3_obj_list)
+            bagging_alg3_obj_avg[ind].append(np.mean(current_bagging_alg3_obj_list))
+            bagging_alg4_obj_list[ind].append(current_bagging_alg4_obj_list)
+            bagging_alg4_obj_avg[ind].append(np.mean(current_bagging_alg4_obj_list))
+    
+    return SAA_obj_list, SAA_obj_avg, bagging_alg1_obj_list, bagging_alg1_obj_avg, bagging_alg3_obj_list, bagging_alg3_obj_avg, bagging_alg4_obj_list, bagging_alg4_obj_avg
