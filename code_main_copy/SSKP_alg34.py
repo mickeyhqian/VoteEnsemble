@@ -13,32 +13,45 @@ if __name__ == "__main__":
     #         'params': [2.0033248484659976, 1.9462659915572313, 2.0148555044660448]
     #     }
 
+    # r = [
+    #     2.68298539,
+    #     3.81716309,
+    #     4.60084485
+    # ]
+    # c = 3.3545021076444534
+    # q = 2.4292864952500386
+
     r = [
-        2.68298539,
-        3.81716309,
-        4.60084485
-    ]
-    c = 3.3545021076444534
-    q = 2.4292864952500386
+    3.2701236422941093,
+    3.3207149493214994,
+    3.556858029428708
+  ]
+    c = 3.7856629820554946
+    q = 1.7096129150007453
+
     sample_args = {
         "type": "pareto",
         "params": [
-        1.94402027,
-        2.18567363,
-        1.91460062]}
+        # 1.94402027,
+        # 2.18567363,
+        # 1.91460062
+        1.966,
+        2.21,
+        1.89
+        ]}
 
     seed = 2024
     rng_sample = np.random.default_rng(seed=seed)
     rng_alg = np.random.default_rng(seed=seed*2)
 
     B_list = [200]
-    k_list = [0.1, 50]
-    B12_list = [(20,200),(20,400)]
-    epsilon = "dynamic"
+    k_list = [0.05, 0.1, 0.2, 0.4, 2, 10, 20, 50]
+    B12_list = [(20,200)]
+    epsilon = 0.005
     tolerance = 0.005
     number_of_iterations = 50
     sample_number = np.array([2**i for i in range(7, 13)])
-    large_number_sample = 300000
+    large_number_sample = 500000
     eval_time = 10
 
     # testing parameters
