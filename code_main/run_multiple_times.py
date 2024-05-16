@@ -1,0 +1,5 @@
+import os
+
+for _ in range(10):  # Run the script 10 times
+    # os.system("python LP_alg34_full_random.py")
+    os.system("python portfolio_alg34_continuous.py")

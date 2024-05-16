@@ -3,29 +3,32 @@ import numpy as np
 from utils.generateSamples import genSample_SSKP
 from ParallelSolve import majority_vote, baggingTwoPhase_woSplit, baggingTwoPhase_wSplit, gurobi_matching, gurobi_matching_DRO_wasserstein
 
+# already modified to the bipartite version.
+
 def generateW(N, option = None):
+    # generate the weight matrix for the maximum weight bipartite matching problem
     # this script is also used to find good parameters
-    # using 1-based index
+    # using 0-based index, need N >= 6
     w = {}
-    for i in range(1, N):
-        for j in range(i+1, N+1):
-            if i <= 3 and j <= 4:
-                w[(i,j)] = None # place holder
-            elif N >= 8 and i >= N-3 and j >= N-2:
+    for i in range(N):
+        for j in range(N):
+            if i < 3 and j < 3:
+                w[(i,j)] = None
+            elif i >= N-3 and j >= N-3:
                 if option == "random":
                     w[(i,j)] = np.random.uniform(1.95, 2.05)
                 else:
-                    w[(i,j)] = 2 # fixed weight
+                    w[(i,j)] = 2
             else:
                 if option == "random":
                     w[(i,j)] = np.random.uniform(1.95, 2.05)
                 else:
-                    w[(i,j)] = np.random.uniform(1.5, 2.5)
+                    w[(i,j)] = np.random.uniform(1.9, 2)
     return w
 
 def matching_obj_optimal(sample_args, N, w):
     # computes the optimal objective value
-    if sample_args['type'] == 'pareto':
+    if sample_args['type'] == 'pareto' or sample_args['type'] == 'sym_pareto' or sample_args['type'] == 'neg_pareto':
         sample_mean = np.reshape([item/(item-1) for item in sample_args['params']], (1, len(sample_args['params'])))
     elif sample_args['type'] == 'normal':
         sample_mean = np.reshape(sample_args['params'][0], (1, len(sample_args['params'][0])))
@@ -35,38 +38,39 @@ def matching_obj_optimal(sample_args, N, w):
     
 
 def matching_evaluate_exact(sample_args, x, N, w):
-    # one difference for this file is that no samples are needed.
+    # evaluate the objective value of a given solution
     # x is the solution, represented as a tuple
     # first, retrieve the sample mean and fill the None values in w
-    ind = 0
-    if sample_args['type'] == 'pareto':
+    if sample_args['type'] == 'pareto' or sample_args['type'] == 'sym_pareto' or sample_args['type'] == 'neg_pareto':
         sample_mean = [item/(item-1) for item in sample_args['params']]
     elif sample_args['type'] == 'normal':
         sample_mean = sample_args['params'][0]
-    for i in range(1,4):
-        for j in range(i+1, 5):
+    
+    ind = 0
+    for i in range(3):
+        for j in range(3):
             w[(i,j)] = sample_mean[ind]
             ind += 1
     
-    # note that, indices of x correspond to (1,2), (1,3), ..., (1,N), (2,3), ..., (N-1, N)
-    edges = [(i, j) for i in range(1, N) for j in range(i + 1, N + 1)]
+    # note that, indices of x correspond to (0,0), (0,2), ..., (0,N-1), (1,0), (1,1), ..., (N-1,N-1)
+    edges = [(i, j) for i in range(N) for j in range(N)]
     ind, obj = 0, 0
     for edge in edges:
         obj += w[edge] * x[ind]
         ind += 1
-    
+
     return obj
 
 def matching_evaluate_wSol(sample_k, x, N, w):
     # the sample-based version of matching_evaluate_exact function, also returns the solution
     ind = 0
     sample_mean = np.mean(sample_k, axis=0)
-    for i in range(1,4):
-        for j in range(i+1, 5):
+    for i in range(3):
+        for j in range(3):
             w[(i,j)] = sample_mean[ind]
             ind += 1
     
-    edges = [(i, j) for i in range(1, N) for j in range(i + 1, N + 1)]
+    edges = [(i, j) for i in range(N) for j in range(N)]
     ind, obj = 0, 0
     for edge in edges:
         obj += w[edge] * x[ind]
@@ -375,11 +379,11 @@ def comparison_epsilon(B, k, B12, epsilon_list, tolerance, number_of_iterations,
 def evaluation_epsilon(SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_alg4_list, sample_args, *prob_args):
     # evaluation function for the epsilon comparison
     sample_number_len = len(SAA_list)
-    number_of_iteration = len(SAA_list[0])
+    number_of_iterations = len(SAA_list[0])
     epsilon_list_len = len(bagging_alg3_list)
     all_solutions = set()
     for i in range(sample_number_len):
-        for j in range(number_of_iteration):
+        for j in range(number_of_iterations):
             all_solutions.add(SAA_list[i][j])
             all_solutions.add(bagging_alg1_list[i][j])
             for ind in range(epsilon_list_len):
@@ -397,7 +401,7 @@ def evaluation_epsilon(SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_a
     for i in range(sample_number_len):
         current_SAA_obj_list = []
         current_bagging_alg1_obj_list = []
-        for j in range(number_of_iteration):
+        for j in range(number_of_iterations):
             SAA_obj = solution_obj_values[str(SAA_list[i][j])]
             current_SAA_obj_list.append(SAA_obj)
             bagging_alg1_obj = solution_obj_values[str(bagging_alg1_list[i][j])]
@@ -411,7 +415,7 @@ def evaluation_epsilon(SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_a
         for i in range(sample_number_len):
             current_bagging_alg3_obj_list = []
             current_bagging_alg4_obj_list = []
-            for j in range(number_of_iteration):
+            for j in range(number_of_iterations):
                 bagging_alg3_obj = solution_obj_values[str(bagging_alg3_list[ind][i][j])]
                 current_bagging_alg3_obj_list.append(bagging_alg3_obj)
                 bagging_alg4_obj = solution_obj_values[str(bagging_alg4_list[ind][i][j])]
@@ -446,7 +450,7 @@ def comparison_DRO(B_list, k_list, B12_list, epsilon, tolerance, varepsilon_list
 
             for ind, varepsilon in enumerate(varepsilon_list):
                 tic = time.time()
-                dro_wasserstein = gurobi_matching_DRO_wasserstein(sample_n, varepsilon, *prob_args)
+                dro_wasserstein = gurobi_matching_DRO_wasserstein(sample_n, *prob_args, varepsilon= varepsilon)
                 dro_wasserstein = tuple([round(x) for x in dro_wasserstein])
                 dro_wasserstein_intermediate[ind].append(dro_wasserstein)
                 print(f"Sample size {n}, iteration {iter}, varepsilon={varepsilon}, DRO time: {time.time()-tic}")

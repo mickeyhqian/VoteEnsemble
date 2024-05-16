@@ -21,7 +21,7 @@ if __name__ == "__main__":
     B12_list = [(20,200)]
     epsilon = "dynamic"
     tolerance = 0.005
-    varepsilon_list = [2**i for i in range(-6,3)]
+    varepsilon_list = [2**i for i in range(-6,1)]
     number_of_iterations = 50
     sample_number = np.array([2**i for i in range(7, 11)])
     large_number_sample = 500000
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     # k_list = [0.1, 10]
     # B12_list = [(2,3),(3,3)]
     # epsilon = "dynamic"
-    # tolerance = 0.001
+    # tolerance = 0.005
     # varepsilon_list = [2**i for i in range(-6,-4)]
     # number_of_iterations = 2
     # sample_number = np.array([2**i for i in range(7, 9)])

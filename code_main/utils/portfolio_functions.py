@@ -12,6 +12,8 @@ def portfolio_evalute_wSol(sample_n, x, p, mu, b, alpha):
     cvar = np.sum(losses[losses > var_threshold] - var_threshold) / len(losses) / (1- alpha) + var_threshold
     return -cvar, x
 
+
+
 def comparison_twoPhase(B_list, k_list, B12_list, epsilon, tolerance, number_of_iterations,sample_number,rng_sample, rng_alg, sample_args, *prob_args):
     # prob_args includes p, mu, b, alpha
     SAA_list = []
@@ -31,25 +33,18 @@ def comparison_twoPhase(B_list, k_list, B12_list, epsilon, tolerance, number_of_
             SAA_intermediate.append(tuple([round(x) for x in SAA]))
             print(f"Sample size {n}, iteration {iter}, SAA time: {time.time()-tic}")
 
-            for ind1, B in enumerate(B_list):
-                for ind2, k in enumerate(k_list):
+            for ind2, (num, ratio) in enumerate(k_list):
+                k = max(num, int(n*ratio))
+                for ind1, B in enumerate(B_list):
                     tic = time.time()
-                    if k < 1:
-                        bagging, _ = majority_vote(sample_n, B, int(n*k), gurobi_portfolio, rng_alg, *prob_args)
-                    else:
-                        bagging, _ = majority_vote(sample_n, B, k, gurobi_portfolio, rng_alg, *prob_args)
+                    bagging, _ = majority_vote(sample_n, B, k, gurobi_portfolio, rng_alg, *prob_args)
                     bagging_alg1_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging]))
                     print(f"Sample size {n}, iteration {iter}, B={B}, k={k}, bagging1 time: {time.time()-tic}")
             
-            for ind1, (B1, B2) in enumerate(B12_list):
-                for ind2, k in enumerate(k_list):
+                for ind1, (B1, B2) in enumerate(B12_list):
                     tic = time.time()
-                    if k < 1:
-                        bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_portfolio, portfolio_evalute_wSol, rng_alg, *prob_args)
-                        bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_portfolio, portfolio_evalute_wSol, rng_alg, *prob_args)
-                    else:
-                        bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_portfolio, portfolio_evalute_wSol, rng_alg, *prob_args)
-                        bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_portfolio, portfolio_evalute_wSol, rng_alg, *prob_args)
+                    bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_portfolio, portfolio_evalute_wSol, rng_alg, *prob_args)
+                    bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_portfolio, portfolio_evalute_wSol, rng_alg, *prob_args)
                     bagging_alg3_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging_alg3]))
                     bagging_alg4_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging_alg4]))
                     print(f"Sample size {n}, iteration {iter}, B1={B1}, B2={B2}, k={k}, Bagging Alg 3 & 4time: {time.time()-tic}")
