@@ -42,8 +42,8 @@ def solution_retrieval(sample_args, N, w, A):
         retrieved_set.add(tuple([float(item) for item in x_opt]))
     return retrieved_set
 
-def solution_evaluation(retrieved_set,  N, w, A):
-    # input a set of solutions, output a diciotnary of objective values
+def solution_evaluation(retrieved_set, N, w, A):
+    # input a set of solutions, output a dictionary of true objective values
     obj_values = {}
     for x in retrieved_set:
         obj_values[x] = LP_evaluate_exact(x, N, w, A)
@@ -92,7 +92,6 @@ def get_suboptimal_set(obj_values, obj_opt, delta):
     return suboptimal_set
 
 def simulate_SAA_pk(n, number_of_iterations, rng_sample, sample_args, N, w, A):
-    # assume sample_number is a number
     pk_dict = {}
     retrieved_set = set()
     for _ in range(number_of_iterations):
@@ -127,7 +126,7 @@ def LP_eta_comparison(delta_list, epsilon, n, number_of_iterations, rng_sample, 
     pk_dict_Alg34 = simulate_Alg34_pk(retrieved_set, x_count_dict, obj_opt_dict, epsilon)
     max_pk_Alg34 = max(pk_dict_Alg34.values())
 
-    obj_values = solution_evaluation(retrieved_set, N, w, A)
+    obj_values = solution_evaluation(retrieved_set, N, w, A) # compute the true objective values
     obj_opt = max(obj_values.values())
 
     SAA_eta_list = []
@@ -136,7 +135,7 @@ def LP_eta_comparison(delta_list, epsilon, n, number_of_iterations, rng_sample, 
         suboptimal_set_delta = get_suboptimal_set(obj_values,obj_opt, delta)
         # get the complement set: retrieved_set\suboptimal_set_delta
         not_suboptimal_set_delta = retrieved_set - suboptimal_set_delta
-        max_pk_SAA_delta = 0
+        max_pk_SAA_delta = 0 # the maximum probability of suboptimal solution
         for x in pk_dict_SAA:
             if check_exist(not_suboptimal_set_delta, x):
                 max_pk_SAA_delta = max(max_pk_SAA_delta, pk_dict_SAA[x])
@@ -171,6 +170,7 @@ def LP_eta_comparison(delta_list, epsilon, n, number_of_iterations, rng_sample, 
     #             else:
     #                 w[(i,j)] = np.random.uniform(1.5, 2.5)
     # return w
+
 
 ############################################################################################################
 def LP_obj_optimal(N, w, A, seed = None):
@@ -420,7 +420,6 @@ def evaluation_epsilon(SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_a
     return SAA_obj_list, SAA_obj_avg, bagging_alg1_obj_list, bagging_alg1_obj_avg, bagging_alg3_obj_list, bagging_alg3_obj_avg, bagging_alg4_obj_list, bagging_alg4_obj_avg
     
 
-
 def comparison_DRO(B_list, k_list, B12_list, epsilon, tolerance, varepsilon_list, number_of_iterations,sample_number,rng_sample, rng_alg, sample_args, *prob_args):
     SAA_list = []
     dro_wasserstein_list = [[] for _ in range(len(varepsilon_list))]
@@ -553,3 +552,55 @@ def evaluation_DRO(SAA_list, dro_wasserstein_list, bagging_alg1_list, bagging_al
 
     return SAA_obj_list, SAA_obj_avg, dro_wasserstein_obj_list, dro_wasserstein_obj_avg, bagging_alg1_obj_list, bagging_alg1_obj_avg, bagging_alg3_obj_list, bagging_alg3_obj_avg, bagging_alg4_obj_list, bagging_alg4_obj_avg
             
+
+
+def tail_influence(B_list, k_tuple, B12_list, epsilon, tolerance, number_of_iterations, n, rng_sample, rng_alg, sample_args_list, prob_args_list):
+    # simulate the probability of achieving the optimal solution for each problem instance
+    # prob_args_list is a list of tuples/lists, corresponds to different problem instances
+    SAA_prob_list = []
+    bagging_alg1_prob_list = [[] for _ in range(len(B_list))]
+    bagging_alg3_prob_list = [[] for _ in range(len(B12_list))]
+    bagging_alg4_prob_list = [[] for _ in range(len(B12_list))]
+    
+    num, ratio = k_tuple
+    k = max(num, int(n*ratio))
+    for ind_instance, prob_args in enumerate(prob_args_list):
+        SAA_opt_times = 0
+        bagging_alg1_opt_times = [0 for _ in range(len(B_list))]
+        bagging_alg3_opt_times = [0 for _ in range(len(B12_list))]
+        bagging_alg4_opt_times = [0 for _ in range(len(B12_list))]
+        
+        obj_opt = LP_obj_optimal(*prob_args)[0]
+        sample_args = sample_args_list[ind_instance]
+        for iter in range(number_of_iterations):
+            tic = time.time()
+            sample_n = genSample_SSKP(n, rng_sample, type = sample_args['type'], params = sample_args['params'])
+            SAA, _ = majority_vote_LP(sample_n, 1, n, gurobi_LP_full_random, rng_alg, *prob_args)
+            if LP_evaluate_exact(SAA, *prob_args) >= obj_opt - 1e-6:
+                SAA_opt_times += 1
+            
+            for ind, B in enumerate(B_list):
+                bagging_alg1, _ = majority_vote_LP(sample_n, B, k, gurobi_LP_full_random, rng_alg, *prob_args)
+                if LP_evaluate_exact(bagging_alg1, *prob_args) >= obj_opt - 1e-6:
+                    bagging_alg1_opt_times[ind] += 1
+            
+            for ind, B12 in enumerate(B12_list):
+                bagging_alg3, _, _, eps_dyn = baggingTwoPhase_woSplit_LP(sample_n, B12[0], B12[1], k, epsilon, tolerance, gurobi_LP_full_random, LP_evaluate_wSol, rng_alg, *prob_args)
+                if LP_evaluate_exact(bagging_alg3, *prob_args) >= obj_opt - 1e-6:
+                    bagging_alg3_opt_times[ind] += 1
+                print(f"Problem instance {ind_instance}, iteration {iter}, B12={B12}, adaptive epsilon: {eps_dyn}")
+                
+                bagging_alg4, _, _, _ = baggingTwoPhase_wSplit_LP(sample_n, B12[0], B12[1], k, epsilon, tolerance, gurobi_LP_full_random, LP_evaluate_wSol, rng_alg, *prob_args)
+                if LP_evaluate_exact(bagging_alg4, *prob_args) >= obj_opt - 1e-6:
+                    bagging_alg4_opt_times[ind] += 1
+            
+            print(f"Problem instance {ind_instance}, iteration {iter}, total time: {time.time()-tic}")
+
+        SAA_prob_list.append(SAA_opt_times/number_of_iterations)
+        for ind in range(len(B_list)):
+            bagging_alg1_prob_list[ind].append(bagging_alg1_opt_times[ind]/number_of_iterations)
+        for ind in range(len(B12_list)):
+            bagging_alg3_prob_list[ind].append(bagging_alg3_opt_times[ind]/number_of_iterations)
+            bagging_alg4_prob_list[ind].append(bagging_alg4_opt_times[ind]/number_of_iterations)
+
+    return SAA_prob_list, bagging_alg1_prob_list, bagging_alg3_prob_list, bagging_alg4_prob_list

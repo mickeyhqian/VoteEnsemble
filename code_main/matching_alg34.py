@@ -12,7 +12,6 @@ if __name__ == "__main__":
     N = 8
 
     # w = generateW(N,"random")
-    
     w = generateW(N)
     sample_args = {
         "type" : "pareto",
@@ -28,38 +27,40 @@ if __name__ == "__main__":
     rng_alg = np.random.default_rng(seed=seed*2)
 
     B_list = [200]
-    k_list = [0.1, 10]
+    k_list = [(10,0.005)]
     B12_list = [(20,200)]
     epsilon = "dynamic"
-    tolerance = 0.005
+    tolerance = 0.001
     number_of_iterations = 50
-    sample_number = np.array([2**i for i in range(6, 13)])
+    sample_number = np.array([2**i for i in range(6, 15)])
 
     # test
     # B_list = [2,3]
-    # k_list = [0.1, 10]
+    # k_list = [(10,0.005)]
     # B12_list = [(2,3), (3,3)]
     # epsilon = "dynamic"
     # tolerance = 0.005
     # number_of_iterations = 2
     # sample_number = np.array([2**i for i in range(7, 9)])
 
+    name = str(w[(1,5)])
+
     tic = time.time()
     SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_alg4_list = comparison_twoPhase(B_list, k_list, B12_list, epsilon, tolerance, number_of_iterations, sample_number, rng_sample, rng_alg, sample_args, N, w.copy())
-    with open("solution_lists.json", "w") as f:
+    with open(name + "solution_lists.json", "w") as f:
         json.dump({"SAA_list": SAA_list, "bagging_alg1_list": bagging_alg1_list, "bagging_alg3_list": bagging_alg3_list, "bagging_alg4_list": bagging_alg4_list}, f)
 
     SAA_obj_list, SAA_obj_avg, bagging_alg1_obj_list, bagging_alg1_obj_avg, bagging_alg3_obj_list, bagging_alg3_obj_avg, bagging_alg4_obj_list, bagging_alg4_obj_avg = evaluation_twoPhase(SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_alg4_list, sample_args, N, w.copy())
-    with open("obj_lists.json", "w") as f:
+    with open(name + "obj_lists.json", "w") as f:
         json.dump({"SAA_obj_list": SAA_obj_list, "SAA_obj_avg": SAA_obj_avg, "bagging_alg1_obj_list": bagging_alg1_obj_list, "bagging_alg1_obj_avg": bagging_alg1_obj_avg, "bagging_alg3_obj_list": bagging_alg3_obj_list, "bagging_alg3_obj_avg": bagging_alg3_obj_avg, "bagging_alg4_obj_list": bagging_alg4_obj_list, "bagging_alg4_obj_avg": bagging_alg4_obj_avg}, f)
     print(f"Total time: {time.time()-tic}")
 
     # plot required graphs
-    plot_twoPhase(SAA_obj_avg, bagging_alg1_obj_avg, bagging_alg3_obj_avg, bagging_alg4_obj_avg, np.log2(sample_number), B_list, k_list, B12_list)
-    plot_CI_twoPhase(SAA_obj_list, bagging_alg1_obj_list, bagging_alg3_obj_list, bagging_alg4_obj_list, np.log2(sample_number), B_list, k_list, B12_list)
+    plot_twoPhase(SAA_obj_avg, bagging_alg1_obj_avg, bagging_alg3_obj_avg, bagging_alg4_obj_avg, np.log2(sample_number), B_list, k_list, B12_list, name= name)
+    plot_CI_twoPhase(SAA_obj_list, bagging_alg1_obj_list, bagging_alg3_obj_list, bagging_alg4_obj_list, np.log2(sample_number), B_list, k_list, B12_list, name= name)
 
     obj_opt, _ = matching_obj_optimal(sample_args, N, w)
-    plot_optGap_twoPhase(obj_opt, "max", SAA_obj_avg, bagging_alg1_obj_avg, bagging_alg3_obj_avg, bagging_alg4_obj_avg, np.log2(sample_number), B_list, k_list, B12_list)
+    plot_optGap_twoPhase(obj_opt, "max", SAA_obj_avg, bagging_alg1_obj_avg, bagging_alg3_obj_avg, bagging_alg4_obj_avg, np.log2(sample_number), B_list, k_list, B12_list, name= name)
 
     parameters = {
         "seed": seed,
@@ -76,5 +77,5 @@ if __name__ == "__main__":
         "obj_opt": obj_opt
     }
 
-    with open("parameters.json", "w") as f:
+    with open(name + "parameters.json", "w") as f:
         json.dump(parameters, f, indent=1)

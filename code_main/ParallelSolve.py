@@ -148,7 +148,6 @@ def get_suboptimality_gap_matrix(sample_n, retrieved_solutions, B2, k, eval_func
     print(f"Time for generating suboptimality gap matrix: {time.time()-tic}")
     return suboptimality_gap_matrix
 
-
 # Note: only Phase I is related to specific algorithms, e.g., SAA, DRO. Phase II is a general solution ranking stage.
 # Note: retrieve_solutions is a list of solutions, so it is ordered
 def baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, opt_func, eval_func, rng, *prob_args, varepsilon = None):
@@ -197,6 +196,128 @@ def baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, opt_func, ev
     epsilon = get_adaptive_epsilon(suboptimality_gap_matrix_n1, tolerance)
     x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix_n2, epsilon)
     return x_max, suboptimality_gap_matrix_n2, retrieved_solutions, epsilon
+
+
+############# LP version Algorithms #############
+def check_exist(x_count, x):
+    if x_count == {}:
+        return None
+    eps = 1e-8
+    for key in x_count:
+        if np.linalg.norm(np.array(key) - np.array(x)) < eps:
+            return key
+    return None
+        
+
+def majority_vote_LP(sample_n, B, k, opt_func, rng, *prob_args):
+    x_count = {}
+    numProcesses = 9
+    sampleLists = [[] for _ in range(numProcesses)]
+    processIndex = 0
+    for _ in range(B):
+        # choose k samples from total n samples
+        sampleLists[processIndex].append(sample_n[rng.choice(sample_n.shape[0], k, replace=False)])
+        processIndex = (processIndex + 1) % numProcesses
+
+    processList: list[Process] = []
+    queue = Queue()
+    for i in range(numProcesses):
+        if len(sampleLists[i]) > 0:
+            processList.append(Process(target=sequentialSolve, args=(opt_func, queue, sampleLists[i], *prob_args), daemon = True))
+    
+    for process in processList:
+        process.start()
+
+    for _ in range(B):
+        x_k = queue.get()
+        if x_k is not None:
+            sol = x_k if type(x_k) == int or type(x_k) == float else tuple(entry for entry in x_k)
+            key = check_exist(x_count, sol)
+            if key is not None:
+                x_count[key] += 1
+            else:
+                x_count[sol] = 1
+    
+    for process in processList:
+        process.join()
+
+    x_max = max(x_count, key=x_count.get)
+    return x_max, list(x_count.keys())
+
+
+# Note, functions baggingPhaseII and baggingPhaseII_epsilonDynamic need not to be modified for the LP version
+def baggingTwoPhase_woSplit_LP(sample_n, B1, B2, k, epsilon, tolerance, opt_func, eval_func, rng, *prob_args, k2 = None):
+    _, retrieved_solutions = majority_vote_LP(sample_n, B1, k, opt_func, rng, *prob_args)
+    if len(retrieved_solutions) == 1:
+        return retrieved_solutions[0], {retrieved_solutions[0]: B2}, retrieved_solutions, 0
+    
+    if k2 is None:
+        k2 = k
+
+    suboptimality_gap_matrix = get_suboptimality_gap_matrix(sample_n, retrieved_solutions, B2, k2, eval_func, rng, *prob_args)
+    if type(epsilon) is not str:
+        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix, epsilon)
+    elif len(retrieved_solutions) == 2: # epsilon == "dynamic" and only two solutions
+        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix, 0)
+        epsilon = 0
+    else: # epsilon == "dynamic" and more than two solutions
+        epsilon = get_adaptive_epsilon(suboptimality_gap_matrix, tolerance)
+        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix, epsilon)
+    
+    return x_max, suboptimality_gap_matrix, retrieved_solutions, epsilon
+
+
+def baggingTwoPhase_wSplit_LP(sample_n, B1, B2, k, epsilon, tolerance, opt_func, eval_func, rng, *prob_args, k2 = None):
+    # implementation of Algorithm 4
+    sample_n1 = sample_n[:int(sample_n.shape[0]/2)]
+    sample_n2 = sample_n[int(sample_n.shape[0]/2):]
+
+    _, retrieved_solutions = majority_vote_LP(sample_n1, B1, k, opt_func, rng, *prob_args)
+
+    if len(retrieved_solutions) == 1:
+        return retrieved_solutions[0], {retrieved_solutions[0]: B2}, retrieved_solutions, 0
+    
+    if k2 is None:
+        k2 = k
+
+    suboptimality_gap_matrix_n2 = get_suboptimality_gap_matrix(sample_n2, retrieved_solutions, B2, k2, eval_func, rng, *prob_args)
+    if type(epsilon) is not str:
+        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix_n2, epsilon)
+        return x_max, suboptimality_gap_matrix_n2, retrieved_solutions, epsilon
+    
+    if len(retrieved_solutions) == 2: # epsilon == "dynamic" and only two solutions
+        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix_n2, 0)
+        epsilon = 0
+        return x_max, suboptimality_gap_matrix_n2, retrieved_solutions, epsilon
+    
+    # epsilon == "dynamic" and more than two solutions
+    suboptimality_gap_matrix_n1 = get_suboptimality_gap_matrix(sample_n1, retrieved_solutions, B2, k2, eval_func, rng, *prob_args)
+    epsilon = get_adaptive_epsilon(suboptimality_gap_matrix_n1, tolerance)
+    x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix_n2, epsilon)
+    return x_max, suboptimality_gap_matrix_n2, retrieved_solutions, epsilon
+
+
+############# Algorithms for testing #############
+def test_baggingTwoPhase_woSplit_LP(sample_n, B1, k, opt_func, eval_func, rng, *prob_args):
+    # assume the problem is a minimization problem
+    # here the eval_func is the exact evaluation function
+    # retrieved_solutions is a list of tuples
+    _, retrieved_solutions = majority_vote_LP(sample_n, B1, k, opt_func, rng, *prob_args)
+    # compute the average of all solution vectors
+    avg_sol = np.mean(retrieved_solutions, axis=0)
+    avg_sol = tuple(float(entry) for entry in avg_sol)
+    obj_avg_sol = eval_func(avg_sol, *prob_args)
+        
+    obj_dict = {sol: eval_func(sol, *prob_args) for sol in retrieved_solutions}
+    # return the solution with the minimum objective value
+    x_min = min(obj_dict, key=obj_dict.get)
+    obj_min = obj_dict[x_min]
+    
+    x_min_avg = avg_sol if obj_avg_sol < obj_min else x_min
+    obj_min_avg = obj_avg_sol if obj_avg_sol < obj_min else obj_min
+
+    return x_min, obj_min, x_min_avg, obj_min_avg
+
 
 
 ############# Maximum weight matching #############
@@ -488,99 +609,6 @@ def gurobi_network_first_stage(sample_k, s, C,Q_sp, Q_pc, R, M, H):
         print("No optimal solution found.")
         return None
 
-
-
-############# LP version Algorithms #############
-def check_exist(x_count, x):
-    if x_count == {}:
-        return None
-    eps = 1e-8
-    for key in x_count:
-        if np.linalg.norm(np.array(key) - np.array(x)) < eps:
-            return key
-    return None
-        
-
-def majority_vote_LP(sample_n, B, k, opt_func, rng, *prob_args):
-    x_count = {}
-    numProcesses = 9
-    sampleLists = [[] for _ in range(numProcesses)]
-    processIndex = 0
-    for _ in range(B):
-        # choose k samples from total n samples
-        sampleLists[processIndex].append(sample_n[rng.choice(sample_n.shape[0], k, replace=False)])
-        processIndex = (processIndex + 1) % numProcesses
-
-    processList: list[Process] = []
-    queue = Queue()
-    for i in range(numProcesses):
-        if len(sampleLists[i]) > 0:
-            processList.append(Process(target=sequentialSolve, args=(opt_func, queue, sampleLists[i], *prob_args), daemon = True))
-    
-    for process in processList:
-        process.start()
-
-    for _ in range(B):
-        x_k = queue.get()
-        if x_k is not None:
-            sol = x_k if type(x_k) == int or type(x_k) == float else tuple(entry for entry in x_k)
-            key = check_exist(x_count, sol)
-            if key is not None:
-                x_count[key] += 1
-            else:
-                x_count[sol] = 1
-    
-    for process in processList:
-        process.join()
-
-    x_max = max(x_count, key=x_count.get)
-    return x_max, list(x_count.keys())
-
-
-# Note, functions baggingPhaseII and baggingPhaseII_epsilonDynamic need not to be modified for the LP version
-def baggingTwoPhase_woSplit_LP(sample_n, B1, B2, k, epsilon, tolerance, opt_func, eval_func, rng, *prob_args):
-    _, retrieved_solutions = majority_vote_LP(sample_n, B1, k, opt_func, rng, *prob_args)
-    if len(retrieved_solutions) == 1:
-        return retrieved_solutions[0], {retrieved_solutions[0]: B2}, retrieved_solutions, 0
-    
-    suboptimality_gap_matrix = get_suboptimality_gap_matrix(sample_n, retrieved_solutions, B2, k, eval_func, rng, *prob_args)
-    if type(epsilon) is not str:
-        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix, epsilon)
-    elif len(retrieved_solutions) == 2: # epsilon == "dynamic" and only two solutions
-        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix, 0)
-        epsilon = 0
-    else: # epsilon == "dynamic" and more than two solutions
-        epsilon = get_adaptive_epsilon(suboptimality_gap_matrix, tolerance)
-        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix, epsilon)
-    
-    return x_max, suboptimality_gap_matrix, retrieved_solutions, epsilon
-
-
-def baggingTwoPhase_wSplit_LP(sample_n, B1, B2, k, epsilon, tolerance, opt_func, eval_func, rng, *prob_args):
-    # implementation of Algorithm 4
-    sample_n1 = sample_n[:int(sample_n.shape[0]/2)]
-    sample_n2 = sample_n[int(sample_n.shape[0]/2):]
-
-    _, retrieved_solutions = majority_vote_LP(sample_n1, B1, k, opt_func, rng, *prob_args)
-
-    if len(retrieved_solutions) == 1:
-        return retrieved_solutions[0], {retrieved_solutions[0]: B2}, retrieved_solutions, 0
-    
-    suboptimality_gap_matrix_n2 = get_suboptimality_gap_matrix(sample_n2, retrieved_solutions, B2, k, eval_func, rng, *prob_args)
-    if type(epsilon) is not str:
-        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix_n2, epsilon)
-        return x_max, suboptimality_gap_matrix_n2, retrieved_solutions, epsilon
-    
-    if len(retrieved_solutions) == 2: # epsilon == "dynamic" and only two solutions
-        x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix_n2, 0)
-        epsilon = 0
-        return x_max, suboptimality_gap_matrix_n2, retrieved_solutions, epsilon
-    
-    # epsilon == "dynamic" and more than two solutions
-    suboptimality_gap_matrix_n1 = get_suboptimality_gap_matrix(sample_n1, retrieved_solutions, B2, k, eval_func, rng, *prob_args)
-    epsilon = get_adaptive_epsilon(suboptimality_gap_matrix_n1, tolerance)
-    x_max = get_PhaseII_solution(retrieved_solutions, suboptimality_gap_matrix_n2, epsilon)
-    return x_max, suboptimality_gap_matrix_n2, retrieved_solutions, epsilon
 
 
 ############# LP problem similar to maximum weight matching #############

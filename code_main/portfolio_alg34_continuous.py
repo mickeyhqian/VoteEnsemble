@@ -6,18 +6,18 @@ from utils.plotting import plot_twoPhase, plot_CI_twoPhase
 
 if __name__ == "__main__":
     seed = 2024
-    # mu = np.random.uniform(1.2,1.8, 6)
-    # b = np.random.uniform(1.2, 1.6)
-
-    mu = np.array([
-    1.298022168012522,
-    1.5139145944126466,
-    1.74027529860629,
-    1.6597781125096558,
-    1.6225302291466706,
-    1.6631624129206548
-  ])
-    b = 1.357202771189245
+    mu = np.random.uniform(1.95,1.98, 10)
+    b = np.random.uniform(1.95, 1.96)
+ 
+#     mu = np.array([
+#     1.9367129768889861,
+#     1.7033293134683836,
+#     1.2301708031827778,
+#     1.5004752383434894,
+#     1.6211307309110454,
+#     1.6204079110596386
+#   ])
+    # b = 1.5140166581891492
 
     params = get_pareto_params(mu)
     sample_args = {
@@ -26,12 +26,13 @@ if __name__ == "__main__":
     }
 
     B_list = []
-    k_list = [(10,0.005), (20, 0.01), (50, 0.05)]
-    B12_list = [(200,200)]
+    k_list = [(50,0)]
+    B12_list = [(200,2000)]
+    k2_tuple = (1000,0)
     epsilon = 'dynamic'
-    tolerance = 0.001
+    tolerance = 0.0001
     number_of_iterations = 20
-    sample_number = np.array([2**i for i in range(7, 16, 2)])
+    sample_number = np.array([2**i for i in range(13, 20, 2)])
 
     # test
     # B_list = []
