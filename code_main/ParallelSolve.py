@@ -320,7 +320,7 @@ def test_baggingTwoPhase_woSplit_LP(sample_n, B1, k, opt_func, eval_func, rng, *
 
 
 
-############# Maximum weight matching #############
+############# Maximum weight bipartite matching #############
 def gurobi_matching(sample_k, N, w):
     # maximum weight bipartite matching
     # sample_k: k * 9 matrix, where each column corresponds the weight of an edge

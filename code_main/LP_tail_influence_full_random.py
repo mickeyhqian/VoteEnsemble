@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     N = 8
     A = np.array([[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1],[1, 1, 1, 1, 1, 1, 1, 1],[1, 1, 1, 1, 1, 1, 1, 1],[1, 1, 1, 1, 1, 1, 1, 1],[1, 1, 1, 1, 1, 1, 1, 1],[1, 1, 1, 1, 1, 1, 1, 1]])
-    base_list = [3, 3.5, 4, 4.5, 5, 5.5, 6]
+    base_list = [3, 3.5, 4, 4.5, 5, 5.5]
     # base_list = [4]
     gap = 0.5
     prob_args_list, sample_args_list = generate_instances(N, base_list, gap, A)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     # test
     B = [2000]
     k_tuple = (50, 0)
-    B12 = [(1000,5000)]
+    B12 = [(200,5000)]
     epsilon = 'dynamic'
     tolerance = 0.01
     number_of_iterations = 200

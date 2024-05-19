@@ -65,10 +65,11 @@ if __name__ == "__main__":
     rng_sample = np.random.default_rng(seed=seed)
     rng_alg = np.random.default_rng(seed=seed*2)    
 
-    B_list = [200]
-    k_list = [0.1, 2]
+    B_list = [1]
+    k_list = [(1,0)]
     number_of_iterations = 200
-    sample_number = np.array([2**i for i in range(5, 12)])
+    # sample_number = np.array([2**i for i in range(5, 12)])
+    sample_number = np.array([2**i for i in range(1,7)])
     large_number_sample = 200000
 
     tic = time.time()

@@ -14,16 +14,18 @@ def generateW(N, option = None):
         for j in range(N):
             if i < 3 and j < 3:
                 w[(i,j)] = None
-            elif i >= N-3 and j >= N-3:
+            elif i >= N-2 and j >= N-2:
                 if option == "random":
                     w[(i,j)] = np.random.uniform(1.95, 2.05)
                 else:
-                    w[(i,j)] = 2
+                    # w[(i,j)] = 2
+                    w[(i,j)] = np.random.uniform(1.9, 2.1)
             else:
                 if option == "random":
                     w[(i,j)] = np.random.uniform(1.95, 2.05)
                 else:
-                    w[(i,j)] = np.random.uniform(1.9, 2)
+                    # w[(i,j)] = np.random.uniform(1.9, 2)
+                    w[(i,j)] = 2.1
     return w
 
 def matching_obj_optimal(sample_args, N, w):
@@ -449,25 +451,18 @@ def comparison_DRO(B_list, k_list, B12_list, epsilon, tolerance, varepsilon_list
                 dro_wasserstein_intermediate[ind].append(dro_wasserstein)
                 print(f"Sample size {n}, iteration {iter}, varepsilon={varepsilon}, DRO time: {time.time()-tic}")
             
-            for ind1, B in enumerate(B_list):
-                for ind2, k in enumerate(k_list):
+            for ind2, (num, ratio) in enumerate(k_list):
+                k = max(num, int(n*ratio))
+                for ind1, B in enumerate(B_list):
                     tic = time.time()
-                    if k < 1:
-                        bagging, _ = majority_vote(sample_n, B, int(n*k), gurobi_matching, rng_alg, *prob_args)
-                    else:
-                        bagging, _ = majority_vote(sample_n, B, k, gurobi_matching, rng_alg, *prob_args)
+                    bagging, _ = majority_vote(sample_n, B, k, gurobi_matching, rng_alg, *prob_args)
                     bagging_alg1_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging]))
                     print(f"Sample size {n}, iteration {iter}, B={B}, k={k}, Bagging Alg 1 time: {time.time()-tic}")
 
-            for ind1, (B1, B2) in enumerate(B12_list):
-                for ind2, k in enumerate(k_list):
+                for ind1, (B1, B2) in enumerate(B12_list):
                     tic = time.time()
-                    if k < 1:
-                        bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
-                        bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, int(n*k), epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
-                    else:
-                        bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
-                        bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                    bagging_alg3, _, _, _ = baggingTwoPhase_woSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+                    bagging_alg4, _, _, _ = baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
                     bagging_alg3_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging_alg3]))
                     bagging_alg4_intermediate[ind1][ind2].append(tuple([round(x) for x in bagging_alg4]))
                     print(f"Sample size {n}, iteration {iter}, B1={B1}, B2={B2}, k={k}, Bagging Alg 3 & 4time: {time.time()-tic}")

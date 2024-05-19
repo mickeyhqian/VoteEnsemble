@@ -9,20 +9,58 @@ from utils.plotting import plot_twoPhase, plot_CI_twoPhase, plot_optGap_twoPhase
 
 if __name__ == "__main__":
     seed = 2024
-    N = 8
+    N = 5
 
     # w = generateW(N,"random")
-    w = generateW(N)
+    # w = generateW(N)
+    w = {(0, 0): 1.8865364093012886,
+ (0, 1): 2.398555301120877,
+ (0, 2): 1.8306427790927857,
+ (0, 3): 1.7492991192565832,
+ (0, 4): 2.3237863958023786,
+ (1, 0): 2.137122473241966,
+ (1, 1): 2.2498292819020653,
+ (1, 2): 1.8709355265561154,
+ (1, 3): 1.7336844551004142,
+ (1, 4): 1.8512613494646823,
+ (2, 0): 1.873453484656252,
+ (2, 1): 2.32957861213437,
+ (2, 2): 2.2815754847013983,
+ (2, 3): 2.1955418952557166,
+ (2, 4): 1.9664292773529026,
+ (3, 0): 1.6368204540890734,
+ (3, 1): 2.1733533180049087,
+ (3, 2): 2.29142702055407,
+ (3, 3): 1.64693564175383,
+ (3, 4): 2.2760005110017376,
+ (4, 0): 2.390491551306702,
+ (4, 1): 2.340076629674212,
+ (4, 2): 1.8125406416083787,
+ (4, 3): 1.9427529395181724,
+ (4, 4): 1.6101934594984615}
+
     sample_args = {
         "type" : "pareto",
         # "type" : "normal",
-        # "params": [2,2,2,2,2,2]
-        "params": np.random.uniform(1.95,2.05,9).tolist()
+        # "params": [2 for _ in range(9)]
+        # "params": np.random.uniform(1.95,2.05,9).tolist()
+        "params": [
+   2.127985257580268,
+   1.7150235669612395,
+   2.203886947758919,
+   1.8794127488738956,
+   1.8001092745067868,
+   2.148190617455044,
+   2.1448806577187685,
+   1.75211799503506,
+   1.7802895825781155
+  ]
         # "params": [[2,2,2,2,2,2], np.random.uniform(1,1.5,6).tolist()]
         # "params": [
         #     [1.9790712457872344, 1.9646657054823478, 1.9845813076676622, 2.006175658708957, 1.962250459541956, 1.9699279489289765],
         #     np.random.uniform(1,1.5,6).tolist()]
     }
+
     rng_sample = np.random.default_rng(seed=seed)
     rng_alg = np.random.default_rng(seed=seed*2)
 
@@ -32,7 +70,8 @@ if __name__ == "__main__":
     epsilon = "dynamic"
     tolerance = 0.001
     number_of_iterations = 50
-    sample_number = np.array([2**i for i in range(6, 15)])
+    sample_number = np.array([2**i for i in range(10, 16)])
+
 
     # test
     # B_list = [2,3]
@@ -43,7 +82,7 @@ if __name__ == "__main__":
     # number_of_iterations = 2
     # sample_number = np.array([2**i for i in range(7, 9)])
 
-    name = str(w[(1,5)])
+    name = str(w[(4,4)])
 
     tic = time.time()
     SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_alg4_list = comparison_twoPhase(B_list, k_list, B12_list, epsilon, tolerance, number_of_iterations, sample_number, rng_sample, rng_alg, sample_args, N, w.copy())
