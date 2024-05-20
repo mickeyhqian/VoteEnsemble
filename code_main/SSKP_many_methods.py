@@ -5,31 +5,38 @@ import numpy as np
 import json
 
 if __name__ == "__main__":
-    r = [3.2701236422941093, 3.3207149493214994, 3.556858029428708]
-    c, q = 3.7856629820554946, 1.7096129150007453
-    sample_args = {
-            'type': 'pareto',
-            'params': [2.0033248484659976, 1.9462659915572313, 2.0148555044660448]
-        }
+    # r = [3.2701236422941093, 3.3207149493214994, 3.556858029428708]
+    # c, q = 3.7856629820554946, 1.7096129150007453
+    # sample_args = {
+    #         'type': 'pareto',
+    #         'params': [2.0033248484659976, 1.9462659915572313, 2.0148555044660448]
+    #     }
     
+    r = [2.68298539, 3.81716309, 4.60084485]
+    c, q = 3.3545021076444534, 2.4292864952500386
+    sample_args = {
+        "type": "pareto",
+        "params": [1.94402027, 2.18567363, 1.91460062]
+    }
+
     seed = 2024
     rng_sample = np.random.default_rng(seed=seed)
     rng_alg = np.random.default_rng(seed=seed*2)
 
     B = 200
-    k = 10
+    k_tuple = (10, 0.005)
     B12 = (20,200)
     epsilon = "dynamic"
     tolerance = 0.005
-    varepsilon = 0.1
+    varepsilon = 2**-5
     number_of_iterations = 50
-    sample_number = np.array([2**i for i in range(7, 11)])
+    sample_number = np.array([2**i for i in range(7, 12)])
     large_number_sample = 500000
     eval_time = 10
 
     # testing parameters
     # B = 2
-    # k = 10
+    # k_tuple = (10, 0.005)
     # B12 = (2,3)
     # epsilon = "dynamic"
     # tolerance = 0.005
@@ -40,7 +47,7 @@ if __name__ == "__main__":
     # eval_time = 2
 
     tic = time.time()
-    SAA_list, dro_wasserstein_list, bagging_alg1_SAA_list, bagging_alg1_DRO_list, bagging_alg3_SAA_list, bagging_alg3_DRO_list, bagging_alg4_SAA_list, bagging_alg4_DRO_list = comparison_many_methods(B,k,B12,epsilon,tolerance,varepsilon,number_of_iterations,sample_number,rng_sample, rng_alg, sample_args, r, c, q)
+    SAA_list, dro_wasserstein_list, bagging_alg1_SAA_list, bagging_alg1_DRO_list, bagging_alg3_SAA_list, bagging_alg3_DRO_list, bagging_alg4_SAA_list, bagging_alg4_DRO_list = comparison_many_methods(B,k_tuple,B12,epsilon,tolerance,varepsilon,number_of_iterations,sample_number,rng_sample, rng_alg, sample_args, r, c, q)
     with open("solution_lists.json", "w") as f:
         json.dump({"SAA_list": SAA_list, "dro_wasserstein_list": dro_wasserstein_list, "bagging_alg1_SAA_list": bagging_alg1_SAA_list, "bagging_alg1_DRO_list": bagging_alg1_DRO_list, "bagging_alg3_SAA_list": bagging_alg3_SAA_list, "bagging_alg3_DRO_list": bagging_alg3_DRO_list, "bagging_alg4_SAA_list": bagging_alg4_SAA_list, "bagging_alg4_DRO_list": bagging_alg4_DRO_list}, f)
     
@@ -82,7 +89,7 @@ if __name__ == "__main__":
         "q": q,
         "sample_args": sample_args,
         "B": B,
-        "k": k,
+        "k_tuple": k_tuple,
         "B12": B12,
         "epsilon": epsilon,
         "tolerance": tolerance,

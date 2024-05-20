@@ -5,25 +5,32 @@ import numpy as np
 import json
 
 if __name__ == "__main__":
-    r = [3.2701236422941093, 3.3207149493214994, 3.556858029428708]
-    c, q = 3.7856629820554946, 1.7096129150007453
+    # r = [3.2701236422941093, 3.3207149493214994, 3.556858029428708]
+    # c, q = 3.7856629820554946, 1.7096129150007453
+    # sample_args = {
+    #         'type': 'pareto',
+    #         'params': [2.0033248484659976, 1.9462659915572313, 2.0148555044660448]
+    #     }
+
+    r = [2.68298539, 3.81716309, 4.60084485]
+    c, q = 3.3545021076444534, 2.4292864952500386
     sample_args = {
-            'type': 'pareto',
-            'params': [2.0033248484659976, 1.9462659915572313, 2.0148555044660448]
-        }
+        "type": "pareto",
+        "params": [1.94402027, 2.18567363, 1.91460062]
+    }
 
     seed = 2024
     rng_sample = np.random.default_rng(seed=seed)
     rng_alg = np.random.default_rng(seed=seed*2)
 
     B_list = [200]
-    k_list = [2, 10]
+    k_list = [(10, 0.005)]
     B12_list = [(20,200)]
     epsilon = "dynamic"
     tolerance = 0.005
-    varepsilon_list = [2**i for i in range(-6,1)]
+    varepsilon_list = [2**i for i in range(-6,2)]
     number_of_iterations = 50
-    sample_number = np.array([2**i for i in range(7, 11)])
+    sample_number = np.array([2**i for i in range(7, 13)])
     large_number_sample = 500000
     eval_time = 10
 

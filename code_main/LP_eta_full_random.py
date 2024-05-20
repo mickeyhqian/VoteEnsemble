@@ -85,21 +85,21 @@ if __name__ == "__main__":
 
     rng_sample = np.random.default_rng(seed=seed)
 
-    delta_list = [0.1, 0.6, 1.1, 1.6, 2.1, 2.6, 3.1]
-    epsilon = 4
-    n = 10
+    delta_list = [0.1, 0.6, 1.1, 1.6, 2.1, 2.6, 3.1, 3.6]
+    epsilon = 2.5
+    n = 50
     number_of_iterations = 500
 
     tic = time.time()
     SAA_eta_list, Alg34_eta_list, retrieved_set, x_count_dict, obj_opt_dict, pk_dict_SAA, pk_dict_Alg34 = LP_eta_comparison(delta_list, epsilon, n, number_of_iterations, rng_sample, sample_args, N, w, A)
     
-    with open("solution_lists_eta.json", "w") as f:
-        json.dump({"SAA_eta": SAA_eta_list, "Alg34_eta": Alg34_eta_list}, f)
+    with open(str(n) + "solution_lists_eta.json", "w") as f:
+        json.dump({"SAA_eta": SAA_eta_list, "Alg34_eta": Alg34_eta_list, "delta_list": delta_list, "epsilon": epsilon}, f)
     
     # with open("retrieved_set.json", "w") as f:
     #     json.dump({"retrieved_set": retrieved_set, "x_count_dict": x_count_dict, "obj_opt_dict": obj_opt_dict, "pk_dict_SAA": pk_dict_SAA, "pk_dict_Alg34": pk_dict_Alg34}, f)
 
     # save the remaining things just in a txt file, so that no need to worry about the format
     
-    with open("remaining.json", "w") as f:
-        json.dump({"retrieved_set": serialize_data(retrieved_set), "x_count_dict": serialize_data(x_count_dict), "obj_opt_dict": serialize_data(obj_opt_dict), "pk_dict_SAA": serialize_data(pk_dict_SAA), "pk_dict_Alg34": serialize_data(pk_dict_Alg34)}, f)
+    # with open("remaining.json", "w") as f:
+    #     json.dump({"retrieved_set": serialize_data(retrieved_set), "x_count_dict": serialize_data(x_count_dict), "obj_opt_dict": serialize_data(obj_opt_dict), "pk_dict_SAA": serialize_data(pk_dict_SAA), "pk_dict_Alg34": serialize_data(pk_dict_Alg34)}, f)

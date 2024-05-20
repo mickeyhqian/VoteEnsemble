@@ -555,3 +555,160 @@ def evaluation_DRO(SAA_list, dro_wasserstein_list, bagging_alg1_list, bagging_al
                 bagging_alg4_obj_avg[ind1][ind2].append(np.mean(current_bagging_obj_list_4))
 
     return SAA_obj_list, SAA_obj_avg, dro_wasserstein_obj_list, dro_wasserstein_obj_avg, bagging_alg1_obj_list, bagging_alg1_obj_avg, bagging_alg3_obj_list, bagging_alg3_obj_avg, bagging_alg4_obj_list, bagging_alg4_obj_avg
+
+
+def comparison_many_methods(B,k_tuple,B12,epsilon,tolerance,varepsilon,number_of_iterations,sample_number,rng_sample, rng_alg, sample_args, *prob_args):
+    SAA_list = []
+    dro_wasserstein_list = []
+    bagging_alg1_SAA_list = []
+    bagging_alg1_DRO_list = []
+    bagging_alg3_SAA_list = []
+    bagging_alg3_DRO_list = []
+    bagging_alg4_SAA_list = []
+    bagging_alg4_DRO_list = []
+
+    num, ratio = k_tuple
+    for n in sample_number:
+        k = max(num, int(n*ratio))
+        SAA_intermediate = []
+        dro_wasserstein_intermediate = []
+        bagging_alg1_SAA_intermediate = []
+        bagging_alg1_DRO_intermediate = []
+        bagging_alg3_SAA_intermediate = []
+        bagging_alg3_DRO_intermediate = []
+        bagging_alg4_SAA_intermediate = []
+        bagging_alg4_DRO_intermediate = []
+
+        for iter in range(number_of_iterations):
+            tic = time.time()
+            sample_n = genSample_SSKP(n, rng_sample, type = sample_args['type'], params = sample_args['params'])
+            SAA, _ = majority_vote(sample_n, 1, n, gurobi_matching, rng_alg, *prob_args)
+            SAA_intermediate.append(tuple([round(x) for x in SAA]))
+            print(f"Sample size {n}, iteration {iter}, SAA time: {time.time()-tic}")
+
+            tic = time.time()
+            dro_wasserstein = gurobi_matching_DRO_wasserstein(sample_n, *prob_args, varepsilon= varepsilon)
+            dro_wasserstein = tuple([round(x) for x in dro_wasserstein])
+            dro_wasserstein_intermediate.append(dro_wasserstein)
+            print(f"Sample size {n}, iteration {iter}, DRO time: {time.time()-tic}")
+
+            tic = time.time()
+            bagging_alg1_SAA, _ = majority_vote(sample_n, B, k, gurobi_matching, rng_alg, *prob_args)
+            bagging_alg1_DRO, _ = majority_vote(sample_n, B, k, gurobi_matching_DRO_wasserstein, rng_alg, *prob_args, varepsilon =varepsilon)
+
+            bagging_alg3_SAA, _, _, _ = baggingTwoPhase_woSplit(sample_n, B12[0], B12[1], k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+            bagging_alg3_DRO, _, _, _ = baggingTwoPhase_woSplit(sample_n, B12[0], B12[1], k, epsilon, tolerance, gurobi_matching_DRO_wasserstein, matching_evaluate_wSol, rng_alg, *prob_args, varepsilon = varepsilon)
+
+            bagging_alg4_SAA, _, _, _ = baggingTwoPhase_wSplit(sample_n, B12[0], B12[1], k, epsilon, tolerance, gurobi_matching, matching_evaluate_wSol, rng_alg, *prob_args)
+            bagging_alg4_DRO, _, _, _ = baggingTwoPhase_wSplit(sample_n, B12[0], B12[1], k, epsilon, tolerance, gurobi_matching_DRO_wasserstein, matching_evaluate_wSol, rng_alg, *prob_args, varepsilon = varepsilon)
+
+            bagging_alg1_SAA_intermediate.append(tuple([round(x) for x in bagging_alg1_SAA]))
+            bagging_alg1_DRO_intermediate.append(tuple([round(x) for x in bagging_alg1_DRO]))
+            bagging_alg3_SAA_intermediate.append(tuple([round(x) for x in bagging_alg3_SAA]))
+            bagging_alg3_DRO_intermediate.append(tuple([round(x) for x in bagging_alg3_DRO]))
+            bagging_alg4_SAA_intermediate.append(tuple([round(x) for x in bagging_alg4_SAA]))
+            bagging_alg4_DRO_intermediate.append(tuple([round(x) for x in bagging_alg4_DRO]))
+            print(f"Sample size {n}, iteration {iter}, Bagging time: {time.time()-tic}")
+
+        SAA_list.append(SAA_intermediate)
+        dro_wasserstein_list.append(dro_wasserstein_intermediate)
+        bagging_alg1_SAA_list.append(bagging_alg1_SAA_intermediate)
+        bagging_alg1_DRO_list.append(bagging_alg1_DRO_intermediate)
+        bagging_alg3_SAA_list.append(bagging_alg3_SAA_intermediate)
+        bagging_alg3_DRO_list.append(bagging_alg3_DRO_intermediate)
+        bagging_alg4_SAA_list.append(bagging_alg4_SAA_intermediate)
+        bagging_alg4_DRO_list.append(bagging_alg4_DRO_intermediate)
+
+    return SAA_list, dro_wasserstein_list, bagging_alg1_SAA_list, bagging_alg1_DRO_list, bagging_alg3_SAA_list, bagging_alg3_DRO_list, bagging_alg4_SAA_list, bagging_alg4_DRO_list
+
+def evaluation_many_methods(SAA_list, dro_wasserstein_list, bagging_alg1_SAA_list, bagging_alg1_DRO_list, bagging_alg3_SAA_list, bagging_alg3_DRO_list, bagging_alg4_SAA_list, bagging_alg4_DRO_list, sample_args, *prob_args):
+    sample_number_len = len(SAA_list)
+    number_of_iterations = len(SAA_list[0])
+    all_solutions = set()
+    for i in range(sample_number_len):
+        for j in range(number_of_iterations):
+            all_solutions.add(SAA_list[i][j])
+            all_solutions.add(dro_wasserstein_list[i][j])
+            all_solutions.add(bagging_alg1_SAA_list[i][j])
+            all_solutions.add(bagging_alg1_DRO_list[i][j])
+            all_solutions.add(bagging_alg3_SAA_list[i][j])
+            all_solutions.add(bagging_alg3_DRO_list[i][j])
+            all_solutions.add(bagging_alg4_SAA_list[i][j])
+            all_solutions.add(bagging_alg4_DRO_list[i][j])
+    
+    solution_obj_values = {}
+    for solution in all_solutions:
+        solution_obj_values[str(solution)] = matching_evaluate_exact(sample_args, solution, *prob_args)
+    
+    SAA_obj_list, SAA_obj_avg = [], []
+    dro_wasserstein_obj_list, dro_wasserstein_obj_avg = [], []
+    bagging_alg1_SAA_obj_list, bagging_alg1_SAA_obj_avg = [], []
+    bagging_alg1_DRO_obj_list, bagging_alg1_DRO_obj_avg = [], []
+    bagging_alg3_SAA_obj_list, bagging_alg3_SAA_obj_avg = [], []
+    bagging_alg3_DRO_obj_list, bagging_alg3_DRO_obj_avg = [], []
+    bagging_alg4_SAA_obj_list, bagging_alg4_SAA_obj_avg = [], []
+    bagging_alg4_DRO_obj_list, bagging_alg4_DRO_obj_avg = [], []
+
+    for i in range(sample_number_len):
+        current_SAA_obj_list = []
+        current_dro_wasserstein_obj_list = []
+        current_bagging_alg1_SAA_obj_list = []
+        current_bagging_alg1_DRO_obj_list = []
+        current_bagging_alg3_SAA_obj_list = []
+        current_bagging_alg3_DRO_obj_list = []
+        current_bagging_alg4_SAA_obj_list = []
+        current_bagging_alg4_DRO_obj_list = []
+        for j in range(number_of_iterations):
+            SAA_obj = solution_obj_values[str(SAA_list[i][j])]
+            dro_wasserstein_obj = solution_obj_values[str(dro_wasserstein_list[i][j])]
+            bagging_alg1_SAA_obj = solution_obj_values[str(bagging_alg1_SAA_list[i][j])]
+            bagging_alg1_DRO_obj = solution_obj_values[str(bagging_alg1_DRO_list[i][j])]
+            bagging_alg3_SAA_obj = solution_obj_values[str(bagging_alg3_SAA_list[i][j])]
+            bagging_alg3_DRO_obj = solution_obj_values[str(bagging_alg3_DRO_list[i][j])]
+            bagging_alg4_SAA_obj = solution_obj_values[str(bagging_alg4_SAA_list[i][j])]
+            bagging_alg4_DRO_obj = solution_obj_values[str(bagging_alg4_DRO_list[i][j])]
+            current_SAA_obj_list.append(SAA_obj)
+            current_dro_wasserstein_obj_list.append(dro_wasserstein_obj)
+            current_bagging_alg1_SAA_obj_list.append(bagging_alg1_SAA_obj)
+            current_bagging_alg1_DRO_obj_list.append(bagging_alg1_DRO_obj)
+            current_bagging_alg3_SAA_obj_list.append(bagging_alg3_SAA_obj)
+            current_bagging_alg3_DRO_obj_list.append(bagging_alg3_DRO_obj)
+            current_bagging_alg4_SAA_obj_list.append(bagging_alg4_SAA_obj)
+            current_bagging_alg4_DRO_obj_list.append(bagging_alg4_DRO_obj)
+        SAA_obj_list.append(current_SAA_obj_list)
+        dro_wasserstein_obj_list.append(current_dro_wasserstein_obj_list)
+        bagging_alg1_SAA_obj_list.append(current_bagging_alg1_SAA_obj_list)
+        bagging_alg1_DRO_obj_list.append(current_bagging_alg1_DRO_obj_list)
+        bagging_alg3_SAA_obj_list.append(current_bagging_alg3_SAA_obj_list)
+        bagging_alg3_DRO_obj_list.append(current_bagging_alg3_DRO_obj_list)
+        bagging_alg4_SAA_obj_list.append(current_bagging_alg4_SAA_obj_list)
+        bagging_alg4_DRO_obj_list.append(current_bagging_alg4_DRO_obj_list)
+        SAA_obj_avg.append(np.mean(current_SAA_obj_list))
+        dro_wasserstein_obj_avg.append(np.mean(current_dro_wasserstein_obj_list))
+        bagging_alg1_SAA_obj_avg.append(np.mean(current_bagging_alg1_SAA_obj_list))
+        bagging_alg1_DRO_obj_avg.append(np.mean(current_bagging_alg1_DRO_obj_list))
+        bagging_alg3_SAA_obj_avg.append(np.mean(current_bagging_alg3_SAA_obj_list))
+        bagging_alg3_DRO_obj_avg.append(np.mean(current_bagging_alg3_DRO_obj_list))
+        bagging_alg4_SAA_obj_avg.append(np.mean(current_bagging_alg4_SAA_obj_list))
+        bagging_alg4_DRO_obj_avg.append(np.mean(current_bagging_alg4_DRO_obj_list))
+
+        evaluation_results = {
+            "SAA_obj_list": SAA_obj_list,
+            "SAA_obj_avg": SAA_obj_avg,
+            "dro_wasserstein_obj_list": dro_wasserstein_obj_list,
+            "dro_wasserstein_obj_avg": dro_wasserstein_obj_avg,
+            "bagging_alg1_SAA_obj_list": bagging_alg1_SAA_obj_list,
+            "bagging_alg1_SAA_obj_avg": bagging_alg1_SAA_obj_avg,
+            "bagging_alg1_DRO_obj_list": bagging_alg1_DRO_obj_list,
+            "bagging_alg1_DRO_obj_avg": bagging_alg1_DRO_obj_avg,
+            "bagging_alg3_SAA_obj_list": bagging_alg3_SAA_obj_list,
+            "bagging_alg3_SAA_obj_avg": bagging_alg3_SAA_obj_avg,
+            "bagging_alg3_DRO_obj_list": bagging_alg3_DRO_obj_list,
+            "bagging_alg3_DRO_obj_avg": bagging_alg3_DRO_obj_avg,
+            "bagging_alg4_SAA_obj_list": bagging_alg4_SAA_obj_list,
+            "bagging_alg4_SAA_obj_avg": bagging_alg4_SAA_obj_avg,
+            "bagging_alg4_DRO_obj_list": bagging_alg4_DRO_obj_list,
+            "bagging_alg4_DRO_obj_avg": bagging_alg4_DRO_obj_avg
+        }
+
+    return evaluation_results
