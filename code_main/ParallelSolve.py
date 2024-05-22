@@ -3,6 +3,7 @@ from gurobipy import Model, GRB, quicksum
 from multiprocessing import Queue, Process
 import time
 from utils.generateSamples import genSample_SSKP
+from sklearn.linear_model import LinearRegression
 
 ############# Utility functions for parallel computation #############
 def sequentialSolve(opt_func, queue: Queue, sampleList, *prob_args):
@@ -740,3 +741,13 @@ def solve_model_selection(sample_k, beta_dict):
         loss_dict[lambda_val] = obj
     best_lambda = min(loss_dict, key = loss_dict.get)
     return best_lambda
+
+############# Linear regression #############
+def solve_LR(sample_n):
+    # train a linear regression model without intercept
+    y = sample_n[:,0]
+    X = sample_n[:,1:]
+    lr = LinearRegression(fit_intercept=False)
+    lr.fit(X, y)
+    # return the beta vector
+    return lr.coef_

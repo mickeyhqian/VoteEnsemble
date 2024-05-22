@@ -31,8 +31,9 @@ if __name__ == "__main__":
     k2_tuple = (1000,0)
     epsilon = 'dynamic'
     tolerance = 0.0001
-    number_of_iterations = 20
-    sample_number = np.array([2**i for i in range(13, 20, 2)])
+    number_of_iterations = 200
+    # sample_number = np.array([2**i for i in range(13, 20, 2)])
+    sample_number = np.array([2**17])
 
     # test
     # B_list = []
