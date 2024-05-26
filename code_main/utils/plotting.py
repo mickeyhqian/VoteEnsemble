@@ -562,3 +562,61 @@ def plot_CI_test(SAA_obj_list, bagging_alg3_obj_list, bagging_alg3_trick_obj_lis
         fig_name = name + "_obj_CI" + ".png"
     plt.savefig(fig_name)
     return
+
+def plot_twoPhase_cdf(SAA_obj_list, bagging_alg1_obj_list, bagging_alg3_obj_list, bagging_alg4_obj_list, sample_number, B_list, k_list, B12_list, name = None, skip_alg1 = False):
+    fig, ax = plt.subplots(nrows=len(sample_number), figsize=(4, len(sample_number) * 3))
+
+    def getCDF(sequence):
+        xList = []
+        yList = []
+        for num in sorted(sequence):
+            if len(xList) == 0:
+                xList.append(num)
+                yList.append(1 / len(sequence))
+            elif num > xList[-1]:
+                xList.append(num)
+                yList.append(yList[-1] + 1 / len(sequence))
+            else:
+                yList[-1] += 1 / len(sequence)
+        
+        tailList = []
+        for i in range(len(yList)):
+            if i == 0:
+                tailList.append(1)
+            else:
+                tailList.append(1 - yList[i - 1])
+
+        return xList, tailList
+
+    for i in range(len(sample_number)):
+        xList, yList = getCDF(SAA_obj_list[i])
+        ax[i].plot(xList, yList, marker = 'o', markeredgecolor = 'none', color = 'blue',linestyle = 'solid', linewidth = 2, label = 'SAA')
+        if not skip_alg1:
+            for ind1, B in enumerate(B_list):
+                for ind2, k in enumerate(k_list):
+                    if B == "X" or k == "X":
+                        continue
+                    xList, yList = getCDF(bagging_alg1_obj_list[ind1][ind2][i])
+                    ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'Alg1, B={B_list[ind1]}, k={k_list[ind2]}')
+        
+        for ind1, B12 in enumerate(B12_list):
+            for ind2, k in enumerate(k_list):
+                if B12 == "X" or k == "X":
+                    continue
+                xList, yList = getCDF(bagging_alg3_obj_list[ind1][ind2][i])
+                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'Alg3, B12={B12_list[ind1]}, k={k_list[ind2]}')
+                xList, yList = getCDF(bagging_alg4_obj_list[ind1][ind2][i])
+                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'Alg4, B12={B12_list[ind1]}, k={k_list[ind2]}')
+        
+        if i == len(sample_number) - 1:
+            ax[i].set_xlabel('Objective')
+        ax[i].set_ylabel('tail prob')
+        ax[i].set_yscale('log')
+        ax[i].set_title(f'sample size = {sample_number[i]}')
+        ax[i].legend(fontsize = 'small')
+    if name == None:
+        fig_name = "tail_" + str(B_list) + '_' +str(k_list) + '_' + str(B12_list) + ".png"
+    else:
+        fig_name = name + "_tail" + ".png"
+    fig.savefig(fig_name, dpi=600)
+    return

@@ -13,7 +13,6 @@ def portfolio_evalute_wSol(sample_n, x, p, mu, b, alpha):
     return -cvar, x
 
 
-
 def comparison_twoPhase(B_list, k_list, B12_list, epsilon, tolerance, number_of_iterations,sample_number,rng_sample, rng_alg, sample_args, *prob_args):
     # prob_args includes p, mu, b, alpha
     SAA_list = []
