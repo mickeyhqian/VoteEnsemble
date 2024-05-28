@@ -73,30 +73,20 @@ def genSample_LASSO(n, rng, sample_args):
     y = np.dot(X_sample, np.reshape(beta, (-1,1))) + noise
     return np.hstack((y, X_sample))
 
-# def genSample_LR(n, rng, sample_args):
-#     # output: a numpy 2-d array, the first column is y, the rest are x
-#     # y = X*beta + sympareto noise
-#     X_sample = genSample_SSKP(n, rng, type = "pareto", params = sample_args["params"])
-#     X_noises = genSample_SSKP(n, rng, type = "sym_pareto", params = sample_args["params"])
-#     beta = sample_args["beta_true"]
-#     noise_shape = sample_args["noise"]
-#     noise = genSample_SSKP(n, rng, type = "sym_pareto_zeromean", params = [noise_shape])
-#     y = np.dot(X_sample, np.reshape(beta, (-1,1))) + noise
-#     return np.hstack((y, X_sample+0.1 * X_noises))
 
-def genSample_LR(n, rng, sample_args):
+def genSample_LR(n, rng, sample_args, add_noise = True):
     # output: a numpy 2-d array, the first column is y, the rest are x
     # y = X*beta + sympareto noise
-#     X_sample = genSample_SSKP(n, rng, type = "pareto", params = sample_args["params"])
     meanX = sample_args["meanX"]
     X_sample_List = []
     for mu in meanX:
          X_sample_List.append(rng.uniform(low=0, high=2*mu, size=n))
     X_sample = np.asarray(X_sample_List).T
-#     X_noises = genSample_SSKP(n, rng, type = "sym_pareto", params = sample_args["params"])
     beta = sample_args["beta_true"]
     noise_shape = sample_args["noise"]
     noise = genSample_SSKP(n, rng, type = "sym_pareto_zeromean", params = [noise_shape])
-    y = np.dot(X_sample, np.reshape(beta, (-1,1))) + noise
-#     return np.hstack((y, X_sample+0.1 * X_noises))
+    if add_noise:
+         y = np.dot(X_sample, np.reshape(beta, (-1,1))) + noise
+    else:
+         y = np.dot(X_sample, np.reshape(beta, (-1,1)))
     return np.hstack((y, X_sample))

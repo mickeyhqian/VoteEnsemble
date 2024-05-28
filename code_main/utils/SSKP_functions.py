@@ -62,7 +62,6 @@ def evaluation_process(all_solutions, large_number_sample, eval_time, rng_sample
     return solution_obj_values
 
 
-
 def evaluation_parallel(SAA_list, bagging_list, large_number_sample, eval_time, rng_sample, sample_args, *prob_args):
     sample_number_len = len(SAA_list)
     number_of_iterations = len(SAA_list[0])
