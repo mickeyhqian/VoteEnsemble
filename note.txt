@@ -1,0 +1,8 @@
+1. change base algorithm --> add algorithm function to ParallelSolve.py
+    * can add test scripts to utils/xxxx_functions.py (e.g., functions like comparison_twoPhase)
+    * change the plotting function in utils/plotting.py
+
+2. test on new problem --> add main solve function (gurobi/sklearn/torch) to ParallelSolve.py
+    * create a new script in utils/, discrete problem can copy from SSKP_functions.py; continuous problem can copy from LP_functions.py
+    * add a new sample generation function to utils/generateSamples.py
+    * when creating the new script, mainly need to change (1) generate sample; (2) change main solve function when calling algorithm functions.

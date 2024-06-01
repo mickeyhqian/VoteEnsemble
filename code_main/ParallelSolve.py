@@ -10,7 +10,6 @@ def sequentialSolve(opt_func, queue: Queue, sampleList, *prob_args):
     for sample in sampleList:
         queue.put(opt_func(sample, *prob_args))
 
-
 def sequentialEvaluate(eval_func, queue: Queue, taskList, *prob_args):
     # this evaluation function is used for final solution evaluation
     # taskList: a list of tuples, tuple[0] is the sample and tuple[1] is the solution
@@ -199,7 +198,7 @@ def baggingTwoPhase_wSplit(sample_n, B1, B2, k, epsilon, tolerance, opt_func, ev
     return x_max, suboptimality_gap_matrix_n2, retrieved_solutions, epsilon
 
 
-############# LP version Algorithms #############
+############# Continuous version Algorithms #############
 def check_exist(x_count, x):
     if x_count == {}:
         return None
@@ -299,6 +298,7 @@ def baggingTwoPhase_wSplit_LP(sample_n, B1, B2, k, epsilon, tolerance, opt_func,
 
 
 ############# Algorithms for testing #############
+# assume the second phase is exactly solved
 def test_baggingTwoPhase_woSplit_LP(sample_n, B1, k, opt_func, eval_func, rng, *prob_args):
     # assume the problem is a minimization problem
     # here the eval_func is the exact evaluation function
@@ -386,15 +386,14 @@ def gurobi_matching_DRO_wasserstein(sample_k, N, w, varepsilon = None):
 
 
 ############# Newsvendor #############
-
 def solveNewsVendorSAA(sample_xi, price, cost):
     sortedData = np.sort(sample_xi)
     q = (price - cost) / price
     idx = int(q * len(sample_xi))
     return 0.1*int(np.ceil(10*sortedData[idx]))
 
-############# SSKP #############
 
+############# SSKP #############
 def prob_simulate_SSKP(n, num_repeats, rng_sample, sample_args, *prob_args):
     # simulate the probability \hat p(x) for a given n
     # the difference from the majority_vote function is that this function uses new samples each time
@@ -461,7 +460,7 @@ def gurobi_SSKP(sample_k, r, c, q):
         print("No optimal solution found.")
         return None
 
-# TODO: need to place varepsilon to the last position
+
 def gurobi_SSKP_DRO_wasserstein(sample_k, r, c, q, varepsilon = None):
     # this varepsilon is the threshold for the Wasserstein distance-based ambiguity set
     k, m = sample_k.shape
@@ -484,6 +483,7 @@ def gurobi_SSKP_DRO_wasserstein(sample_k, r, c, q, varepsilon = None):
         print("No optimal solution found.")
         return None
  
+
 ############# Portfolio #############
 def gurobi_portfolio(sample_xi, p, mu, b, alpha):
     # input:
@@ -521,6 +521,7 @@ def gurobi_portfolio(sample_xi, p, mu, b, alpha):
     else:
         print("No optimal solution found.")
         return None
+
 
 ############# Continuous portfolio #############
 def gurobi_portfolio_continuous(sample_xi, mu, b):
@@ -741,6 +742,7 @@ def solve_model_selection(sample_k, beta_dict):
         loss_dict[lambda_val] = obj
     best_lambda = min(loss_dict, key = loss_dict.get)
     return best_lambda
+
 
 ############# Linear regression #############
 def solve_LR(sample_n):

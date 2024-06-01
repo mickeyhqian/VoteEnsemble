@@ -6,13 +6,15 @@ from utils.plotting import plot_twoPhase, plot_CI_twoPhase, plot_twoPhase_cdf
 
 if __name__ == "__main__":
     seed = 2024
-    rng_problem = np.random.default_rng(seed=seed-1)
+    # rng_problem = np.random.default_rng(seed=seed-1)
     rng_sample = np.random.default_rng(seed=seed)
     rng_alg = np.random.default_rng(seed=seed*2)
 
-    meanX = rng_problem.uniform(1.1, 1.9, 10)
-    beta_true = rng_problem.uniform(1, 20, 10)
-    noise = 2.1
+    # meanX = rng_problem.uniform(1.1, 1.9, 10)
+    # beta_true = rng_problem.uniform(1, 20, 10)
+    meanX = np.random.uniform(1.1, 1.9, 10)
+    beta_true = np.random.uniform(1, 20, 10)
+    noise = 2
 
     # temporarily use the same sample generation as linear regression
     sample_args = {
@@ -30,7 +32,7 @@ if __name__ == "__main__":
     B12_list = [(30, 200)]
     epsilon = 'dynamic'
     tolerance = 1e-3
-    number_of_iterations = 10
+    number_of_iterations = 20
     sample_number = np.array([2**i for i in range(7, 14)])
     large_number_sample = 100000
     eval_time = 10

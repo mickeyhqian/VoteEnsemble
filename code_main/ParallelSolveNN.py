@@ -351,9 +351,8 @@ def prepare_data(X, y, batch_size=16):
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)  # Create DataLoader
     return dataloader
 
-
+# convert the model parameters to a 1-d numpy array (flat)
 def model_to_numpy_flat(model):
-    # convert the model parameters to a 1-d numpy array
     params = []
     for param in model.parameters():
         flat_param = param.detach().cpu().numpy().flatten()

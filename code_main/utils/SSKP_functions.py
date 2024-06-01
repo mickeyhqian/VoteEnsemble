@@ -23,7 +23,6 @@ def SSKP_eval_wSol(sample, x, r, c, q):
      opt = sum(r[i] * x[i] for i in range(len(x))) - c * expected_cost
      return opt, x
 
-
 def evaluation_process(all_solutions, large_number_sample, eval_time, rng_sample, sample_args, *prob_args):
     # parallel evaluation for SSKP (need modification for new problems)
     solution_obj_values = {str(solution): [] for solution in all_solutions}
@@ -118,7 +117,9 @@ def comparison_twoPhase(B_list, k_list, B12_list, epsilon, tolerance, number_of_
         bagging_alg4_intermediate = [[ [] for _ in range(len(k_list)) ] for _ in range(len(B12_list))]
         for iter in range(number_of_iterations):
             tic = time.time()
+            # generate samples
             sample_n = genSample_SSKP(n, rng_sample, type = sample_args['type'], params = sample_args['params'])
+            # need to change gurobi_SSKP for different problem
             SAA, _ = majority_vote(sample_n, 1, n, gurobi_SSKP, rng_alg, *prob_args)
             SAA_intermediate.append(tuple([round(x) for x in SAA]))
             print(f"Sample size {n}, iteration {iter}, SAA time: {time.time()-tic}")
@@ -211,6 +212,7 @@ def evaluation_twoPhase(SAA_list, bagging_alg1_list, bagging_alg3_list, bagging_
     return SAA_obj_list, SAA_obj_avg, bagging_alg1_obj_list, bagging_alg1_obj_avg, bagging_alg3_obj_list, bagging_alg3_obj_avg, bagging_alg4_obj_list, bagging_alg4_obj_avg
 
 
+# compare probability of achieving optimal solution
 def SSKP_prob_comparison(B_list, k_list, sample_number, large_number_sample, number_of_iterations, rng_sample, rng_alg, sample_args, *prob_args):
     # function that compare the probability of outputting the optimal solution for SAA and Bagging-SAA (Algorithm 1)
     sample_large = genSample_SSKP(large_number_sample, rng_sample, type = sample_args['type'], params = sample_args['params'])
@@ -270,6 +272,7 @@ def SSKP_prob_comparison(B_list, k_list, sample_number, large_number_sample, num
     
     return SAA_prob_opt_list, SAA_prob_diff_list, SAA_prob_dist_list, bagging_prob_opt_list, bagging_prob_diff_list, bagging_prob_dist_list, x_star
 
+# varepsilon_list stands for regularization weight of DRO
 def comparison_DRO(B_list, k_list, B12_list, epsilon, tolerance, varepsilon_list, number_of_iterations,sample_number,rng_sample, rng_alg, sample_args, *prob_args):
     SAA_list = []
     dro_wasserstein_list = [[] for _ in range(len(varepsilon_list))]
@@ -328,7 +331,6 @@ def comparison_DRO(B_list, k_list, B12_list, epsilon, tolerance, varepsilon_list
                 bagging_alg4_list[ind1][ind2].append(bagging_alg4_intermediate[ind1][ind2])
         
     return SAA_list, dro_wasserstein_list, bagging_alg1_list, bagging_alg3_list, bagging_alg4_list
-
 
 
 def evaluation_DRO(SAA_list, dro_wasserstein_list, bagging_alg1_list, bagging_alg3_list, bagging_alg4_list, large_number_sample, eval_time, rng_sample, sample_args, *prob_args):
@@ -403,6 +405,7 @@ def evaluation_DRO(SAA_list, dro_wasserstein_list, bagging_alg1_list, bagging_al
     return SAA_obj_list, SAA_obj_avg, dro_wasserstein_obj_list, dro_wasserstein_obj_avg, bagging_alg1_obj_list, bagging_alg1_obj_avg, bagging_alg3_obj_list, bagging_alg3_obj_avg, bagging_alg4_obj_list, bagging_alg4_obj_avg
 
 
+# compare DRO+bagging and SAA+bagging
 def comparison_many_methods(B,k_tuple,B12,epsilon,tolerance,varepsilon,number_of_iterations,sample_number,rng_sample, rng_alg, sample_args, *prob_args):
     # compare the performance of SAA, Bagging SAA, DRO, Bagging DRO
     # only supports a fixed choice of bagging parameter (a fixed choice of B and k)

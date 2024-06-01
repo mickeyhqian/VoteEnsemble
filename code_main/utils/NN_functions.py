@@ -25,7 +25,6 @@ class RegressionNN(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-
 def get_sample_based_loss_wSol(sample_k, model_params, layer_sizes):   
     # note this function can also be used for the evaluation of the model
     # during evalution, we use a large amount of noise free samples
@@ -33,6 +32,7 @@ def get_sample_based_loss_wSol(sample_k, model_params, layer_sizes):
     y_true = torch.Tensor(sample_k[:, 0]).unsqueeze(1)
     input_size = X.shape[1]
 
+    # deduce the parameter shapes from architecture
     def compute_shapes(input_size, layer_sizes):
         shapes = []
         previous_size = input_size
@@ -47,6 +47,7 @@ def get_sample_based_loss_wSol(sample_k, model_params, layer_sizes):
         shapes.append((1,))  # Output layer bias shape
         return shapes
 
+    # restore the model from the flat parameters
     def restore_model_from_flat(flat_params, input_size, layer_sizes):
         if isinstance(flat_params, tuple):
             flat_params = np.array(flat_params)
@@ -77,6 +78,8 @@ def get_sample_based_loss_wSol(sample_k, model_params, layer_sizes):
     loss = criterion(y_pred, y_true)
     
     return -loss.item(), model_params # note that we already took the average during the computation of the MSE
+
+
 
 def comparison_twoPhase(k_list, B12_list, epsilon, tolerance, number_of_iterations, sample_number, rng_sample, rng_alg, sample_args, *prob_args, k2_tuple = None):
     # note that only layer_sizes is passed in prob_args
