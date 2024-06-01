@@ -1,3 +1,7 @@
+Ignore code_archive and code_main_copy. Can only look at code_main folder.
+
+Refer to: https://github.com/PrejudiceDDH/Bagging, for general introduction to the submitted codes (which is a subset of the codes here).
+
 1. change base algorithm --> add algorithm function to ParallelSolve.py
     * can add test scripts to utils/xxxx_functions.py (e.g., functions like comparison_twoPhase)
     * change the plotting function in utils/plotting.py
