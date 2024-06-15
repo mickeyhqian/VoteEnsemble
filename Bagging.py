@@ -62,10 +62,10 @@ class BAG(metaclass = ABCMeta):
 
     def _trainOnSubsamples(self, sample: NDArray, k: int, B: int) -> List:
         if B <= 0:
-            raise ValueError(f"B = {B} <= 0")
+            raise ValueError(f"{self._trainOnSubsamples.__qualname__}: B = {B} <= 0")
         n: int = len(sample)
         if n < k:
-            raise ValueError(f"n = {n} < k = {k}")
+            raise ValueError(f"{self._trainOnSubsamples.__qualname__}: n = {n} < k = {k}")
         
         subsampleLists: List[List[Tuple[int, List[int]]]] = []
         processIndex = 0
@@ -101,7 +101,7 @@ class BAG(metaclass = ABCMeta):
 
     def _majorityVote(self, trainingOutputList: List) -> Any:
         if len(trainingOutputList) == 0:
-            return None
+            raise ValueError(f"{self._majorityVote.__qualname__}: empty candidate set")
         
         candidateCount: List[int] = [0 for _ in range(len(trainingOutputList))]
         maxIndex = -1
@@ -175,10 +175,10 @@ class ReBAG(BAG):
 
     def _evaluateOnSubsamples(self, candidateList: List, sample: NDArray, k: int, B: int) -> NDArray:
         if B <= 0:
-            raise ValueError(f"B = {B} <= 0")
+            raise ValueError(f"{self._evaluateOnSubsamples.__qualname__}: B = {B} <= 0")
         n: int = len(sample)
         if n < k:
-            raise ValueError(f"n = {n} < k = {k}")
+            raise ValueError(f"{self._evaluateOnSubsamples.__qualname__}: n = {n} < k = {k}")
         
         subsampleLists: List[List[Tuple[int, List[int]]]] = []
         processIndex = 0
@@ -213,7 +213,7 @@ class ReBAG(BAG):
 
         evalOutputList = np.asarray(evalOutputList, dtype = np.float64)
         if not np.isfinite(evalOutputList).all():
-            raise ValueError("failed to evaluate all the training objective values")
+            raise ValueError(f"{self._evaluateOnSubsamples.__qualname__}: failed to evaluate all the training objective values")
 
         return evalOutputList
     
@@ -275,7 +275,7 @@ class ReBAG(BAG):
         if self._dataSplit:
             n1 = len(sample) // 2
             if n1 <= 0 or n1 >= len(sample):
-                return None
+                raise ValueError(f"{self.run.__qualname__}: insufficient data n = {len(sample)}")
             sample1 = sample[:n1]
             sample2 = sample[n1:]
 
@@ -293,7 +293,7 @@ class ReBAG(BAG):
                 retrievedList.append(output1)
 
         if len(retrievedList) == 0:
-            return None
+            raise ValueError(f"{self.run.__qualname__}: failed to retrieve any model")
         
         evalArray = self._evaluateOnSubsamples(retrievedList, sample2, k2, B2)
         gapMatrix = self._gapMatrix(evalArray)
