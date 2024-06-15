@@ -7,14 +7,18 @@ from typing import List, Any, Tuple
 
 
 class BAG(metaclass = ABCMeta):
-    def __init__(self, numParallel: int = 1, randomState: np.random.Generator | int | None = None):
+    def __init__(self, numParallelTrain: int = 1, randomState: np.random.Generator | int | None = None):
+        """
+        numParallelTrain: number of processes used for parallel training, <= 1 disables parallel training. Default 1
+        randomState: a random number generator or a seed to be used to initialize a generator. Default None
+        """
         if isinstance(randomState, np.random.Generator):
             self._rng = randomState
         elif isinstance(randomState, int) and randomState >= 0:
             self._rng = np.random.default_rng(seed = randomState)
         else:
             self._rng = np.random.default_rng()
-        self._numParallel: int = max(1, numParallel)
+        self._numParallelTrain: int = max(1, numParallelTrain)
 
     @abstractmethod
     def train(self, sample: NDArray) -> Any:
@@ -27,29 +31,26 @@ class BAG(metaclass = ABCMeta):
         """
         pass
 
-    @staticmethod
     @abstractmethod
-    def identicalTrainingOuputs(output1: Any, output2: Any) -> bool:
+    def identicalTrainingOuputs(self, output1: Any, output2: Any) -> bool:
         """
         return whether two training results are considered identical
         """
         pass
 
-    def serialize(self, trainingOutput: Any) -> bytes:
+    @abstractmethod
+    def toPickleble(self, trainingOutput: Any) -> Any:
         """
-        serialization method for training results
-        
-        To be overridden if the output of self.train may not be pickleable and parallel training is enabled (self._numParallel > 1)
+        method that transforms a training result to a pickleable object (e.g. basic python types), to be used only if parallel training is enabled (self._numParallelTrain > 1)
         """
-        return trainingOutput
+        pass
 
-    def deserialize(self, serializedTrainingOutput: bytes) -> Any:
+    @abstractmethod
+    def fromPickleable(self, pickleableTrainingOutput: Any) -> Any:
         """
-        deserialization method for training results
-
-        To be overridden if the output of self.train may not be pickleable and parallel training is enabled (self._numParallel > 1)
+        the inverse of self.toPickleable, to be used only if parallel training is enabled (self._numParallelTrain > 1)
         """
-        return serializedTrainingOutput
+        pass
 
     def _subProcessTrain(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
         for index, subsampleIndices in subsampleList:
@@ -57,7 +58,7 @@ class BAG(metaclass = ABCMeta):
             if trainingOutput is None:
                 queue.put((index, trainingOutput))
             else:
-                queue.put((index, self.serialize(trainingOutput)))
+                queue.put((index, self.toPickleble(trainingOutput)))
 
     def _trainOnSubsamples(self, sample: NDArray, k: int, B: int) -> List:
         if B <= 0:
@@ -73,7 +74,7 @@ class BAG(metaclass = ABCMeta):
                 subsampleLists.append([])
             newSubsample = self._rng.choice(n, k, replace=False)
             subsampleLists[processIndex].append((b, newSubsample.tolist()))
-            processIndex = (processIndex + 1) % self._numParallel
+            processIndex = (processIndex + 1) % self._numParallelTrain
 
         trainingOutputList: List = [None for _ in range(B)]
 
@@ -91,7 +92,7 @@ class BAG(metaclass = ABCMeta):
             for _ in range(B):
                 index, trainingOutput = queue.get()
                 if trainingOutput is not None:
-                    trainingOutputList[index] = self.deserialize(trainingOutput)
+                    trainingOutputList[index] = self.fromPickleable(trainingOutput)
 
             for process in processList:
                 process.join()
@@ -135,14 +136,29 @@ class BAG(metaclass = ABCMeta):
 
 
 class ReBAG(BAG):
-    def __init__(self, dataSplit: bool, numParallel: int = 1, randomState: np.random.Generator | int | None = None):
-        super().__init__(numParallel = numParallel, randomState = randomState)
+    def __init__(self, dataSplit: bool, numParallelEval: int = 1, numParallelTrain: int = 1, randomState: np.random.Generator | int | None = None):
+        """
+        dataSplit: whether or not (ReBAGS vs ReBAG) to split the data across the model candidate retrieval phase and the majority-vote phase
+        numParallelEval: number of processes used for parallel evaluation of training objective, <= 1 disables parallel evaluation. Default 1
+        numParallelTrain: number of processes used for parallel training, <= 1 disables parallel training. Default 1
+        randomState: a random number generator or a seed to be used to initialize a generator. Default None
+        """
+        super().__init__(numParallelTrain = numParallelTrain, randomState = randomState)
         self._dataSplit: bool = dataSplit
+        self._numParallelEval: int = max(1, numParallelEval)
+
+    @property
+    @abstractmethod
+    def isMinimize(self):
+        """
+        whether the training problem is a minimization
+        """
+        pass
 
     @abstractmethod
-    def trainingObjective(self, trainingOutput: Any, sample: NDArray) -> float:
+    def evaluate(self, trainingOutput: Any, sample: NDArray) -> float:
         """
-        compute the training objective for a training result on a data set (must be consistent with the training objective minimized by self.train)
+        evaluate the training objective for a training result on a data set (must be consistent with the training objective optimized by self.train)
 
         trainingOutput: a training result, e.g., a solution vector (for optimization problems) or a machine learning model (for machine learning problems)
         sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
@@ -151,17 +167,117 @@ class ReBAG(BAG):
         """
         pass
 
-    def run(self, sample: NDArray, k1: int, k2: int, B1: int, B2: int) -> Any:
-        sample = np.asarray(sample)
+    def _subProcessEvaluate(self, candidateList: List, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
+        candidateList = [self.fromPickleable(candidate) for candidate in candidateList]
+        for index, subsampleIndices in subsampleList:
+            objectiveList: List[float] = [self.evaluate(candidate, sample[subsampleIndices]) for candidate in candidateList]
+            queue.put((index, objectiveList))
+
+    def _evaluateOnSubsamples(self, candidateList: List, sample: NDArray, k: int, B: int) -> NDArray:
+        if B <= 0:
+            raise ValueError(f"B = {B} <= 0")
         n: int = len(sample)
-        if n < 2:
-            return None
+        if n < k:
+            raise ValueError(f"n = {n} < k = {k}")
         
+        subsampleLists: List[List[Tuple[int, List[int]]]] = []
+        processIndex = 0
+        for b in range(B):
+            if processIndex >= len(subsampleLists):
+                subsampleLists.append([])
+            newSubsample = self._rng.choice(n, k, replace=False)
+            subsampleLists[processIndex].append((b, newSubsample.tolist()))
+            processIndex = (processIndex + 1) % self._numParallelEval
+
+        evalOutputList: List[List[float]] = [None for _ in range(B)]
+
+        if len(subsampleLists) <= 1:
+            for subsampleList in subsampleLists:
+                for index, subsampleIndices in subsampleList:
+                    objectiveList: List[float] = [self.evaluate(candidate, sample[subsampleIndices]) for candidate in candidateList]
+                    evalOutputList[index] = objectiveList
+        else:
+            queue = Queue()
+            pickleableList = [self.toPickleble(candidate) for candidate in candidateList]
+            processList: List[Process] = [Process(target = self._subProcessEvaluate, args = (pickleableList, sample, subsampleList, queue), daemon = True) for subsampleList in subsampleLists]
+            
+            for process in processList:
+                process.start()
+
+            for _ in range(B):
+                index, evalOutput = queue.get()
+                evalOutputList[index] = evalOutput
+
+            for process in processList:
+                process.join()
+
+        evalOutputList = np.asarray(evalOutputList, dtype = np.float64)
+        if not np.isfinite(evalOutputList).all():
+            raise ValueError("failed to evaluate all the training objective values")
+
+        return evalOutputList
+    
+    @staticmethod
+    def _epsilonOptimalProb(gapMatrix: NDArray, epsilon: float) -> NDArray:
+        return np.mean(gapMatrix <= epsilon, axis = 0)
+
+    @staticmethod
+    def _findEpsilon(gapMatrix: NDArray, autoEpsilonProb: float) -> float:
+        probArray = ReBAG._epsilonOptimalProb(gapMatrix, 0)
+        if probArray.max() >= autoEpsilonProb:
+            return 0
+        
+        left, right = 0, 1
+        probArray = ReBAG._epsilonOptimalProb(gapMatrix, right)
+        while probArray.max() < autoEpsilonProb:
+            left = right
+            right *= 2
+            probArray = ReBAG._epsilonOptimalProb(gapMatrix, right)
+        
+        tolerance = 1e-3
+        while max(right - left, (right - left) / (abs(left) / 2 + abs(right) / 2 + 1e-5)) > tolerance:
+            mid = (left + right) / 2
+            probArray = ReBAG._epsilonOptimalProb(gapMatrix, mid)
+            if probArray.max() >= autoEpsilonProb:
+                right = mid
+            else:
+                left = mid
+        
+        return right
+    
+    def _gapMatrix(self, evalArray: NDArray) -> NDArray:
+        if self.isMinimize:
+            bestObj = evalArray.min(axis = 1, keepdims = True)
+            gapMatrix = evalArray - bestObj
+        else:
+            bestObj = evalArray.max(axis = 1, keepdims = True)
+            gapMatrix = bestObj - evalArray
+        return gapMatrix
+
+    def run(self, sample: NDArray, k1: int, k2: int, B1: int, B2: int, epsilon: float, autoEpsilonProb: float = 0.5) -> Any:
+        """
+        run ReBAG or ReBAGS
+
+        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        k1: subsample size for the model candidate retrieval phase
+        k2: subsample size for the majority-vote phase
+        B1: number of subsamples to draw in the model candidate retrieval phase
+        B2: number of subsamples to draw in the majority-vote phase
+        epsilon: the suboptimality threshold, auto-selection applied if < 0
+        autoEpsilonProb: the probability threshold guiding the auto-selection of epsilon. Default 0.5
+
+        return the bagged training result
+        """
+        sample = np.asarray(sample)
         sample1 = sample
         sample2 = sample
+
         if self._dataSplit:
-            sample1 = sample[:n//2]
-            sample2 = sample[n//2:]
+            n1 = len(sample) // 2
+            if n1 <= 0 or n1 >= len(sample):
+                return None
+            sample1 = sample[:n1]
+            sample2 = sample[n1:]
 
         trainingOutputs = self._trainOnSubsamples(sample1, k1, B1)
 
@@ -179,4 +295,17 @@ class ReBAG(BAG):
         if len(retrievedList) == 0:
             return None
         
-        
+        evalArray = self._evaluateOnSubsamples(retrievedList, sample2, k2, B2)
+        gapMatrix = self._gapMatrix(evalArray)
+
+        if epsilon < 0:
+            autoEpsilonProb = min(max(0, autoEpsilonProb), 1)
+            if self._dataSplit:
+                evalArray = self._evaluateOnSubsamples(retrievedList, sample1, k2, B2)
+                gapMatrix1 = self._gapMatrix(evalArray)
+                epsilon = ReBAG._findEpsilon(gapMatrix1, autoEpsilonProb)
+            else:
+                epsilon = ReBAG._findEpsilon(gapMatrix, autoEpsilonProb)
+    
+        probArray = ReBAG._epsilonOptimalProb(gapMatrix, epsilon)
+        return retrievedList[np.argmax(probArray)]
