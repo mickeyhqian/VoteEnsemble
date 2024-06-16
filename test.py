@@ -4,6 +4,8 @@ from multiprocessing import set_start_method
 import os
 import time
 
+
+
 if __name__ == "__main__":
     rngData = np.random.default_rng(seed = 888)
     N = 10000
