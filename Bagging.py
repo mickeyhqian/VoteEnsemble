@@ -18,6 +18,7 @@ class BAG(metaclass = ABCMeta):
             self._rng = np.random.default_rng(seed = randomState)
         else:
             self._rng = np.random.default_rng()
+        self._rngState = self._rng.__getstate__()
         self._numParallelTrain: int = max(1, int(numParallelTrain))
 
     @abstractmethod
@@ -53,6 +54,12 @@ class BAG(metaclass = ABCMeta):
         similar to toPickleable, the default implementation directly returns pickleableTrainingResult, and is to be overridden if the original trainingResult is not pickleable
         """
         return pickleableTrainingResult
+    
+    def resetRandomState(self):
+        """
+        reset the random number generator to its initial state
+        """
+        self._rng.__setstate__(self._rngState)
 
     def _subProcessTrain(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
         for index, subsampleIndices in subsampleList:
