@@ -1,4 +1,4 @@
-from BaggingExamples import ReBaggedLRCoef, ReBaggedLRModel
+from Examples import ReBaggedLRCoef, ReBaggedLRModel
 import numpy as np
 from multiprocessing import set_start_method
 import os
