@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 
 
 
-class BaggedBinary(BAG):
+class BagBinary(BAG):
     def train(self, sample: NDArray) -> int:
         meanArray = np.mean(sample, axis = 0)
         return np.argmin(meanArray)
@@ -14,7 +14,7 @@ class BaggedBinary(BAG):
         return result1 == result2
 
 
-class ReBaggedLR(ReBAG):
+class ReBagLR(ReBAG):
     def train(self, sample: NDArray) -> LinearRegression:
         y = sample[:,0]
         X = sample[:,1:]
