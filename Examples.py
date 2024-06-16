@@ -5,6 +5,15 @@ from numpy.typing import NDArray
 
 
 
+class BaggedBinary(BAG):
+    def train(self, sample: NDArray) -> int:
+        meanArray = np.mean(sample, axis = 0)
+        return np.argmin(meanArray)
+    
+    def identicalTrainingResults(self, result1: int, result2: int) -> bool:
+        return result1 == result2
+    
+
 class ReBaggedLRCoef(ReBAG):
     def train(self, sample: NDArray) -> NDArray:
         y = sample[:,0]

@@ -25,9 +25,9 @@ class BAG(metaclass = ABCMeta):
         """
         base training algorithm
 
-        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        sample: n * d numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
 
-        return a training result, e.g., a solution vector (for optimization problems) or a machine learning model (for machine learning problems)
+        return a training result of any type, e.g., a solution scaler/vector (for optimization problems) or a machine learning model (for machine learning problems)
         """
         pass
 
@@ -42,7 +42,7 @@ class BAG(metaclass = ABCMeta):
         """
         method that transforms a training result to a pickleable object (e.g. basic python types), to be used only if parallel training is enabled (self._numParallelTrain > 1)
 
-        The default implementation directly returns trainingResult, and is to be overridden if trainingResult is not pickleable
+        the default implementation directly returns trainingResult, and is to be overridden if trainingResult is not pickleable
         """
         return trainingResult
 
@@ -50,7 +50,7 @@ class BAG(metaclass = ABCMeta):
         """
         the inverse of toPickleable, to be used only if parallel training is enabled (self._numParallelTrain > 1)
 
-        Similar to toPickleable, the default implementation directly returns pickleableTrainingResult, and is to be overridden if the original trainingResult is not pickleable
+        similar to toPickleable, the default implementation directly returns pickleableTrainingResult, and is to be overridden if the original trainingResult is not pickleable
         """
         return pickleableTrainingResult
 
@@ -127,7 +127,7 @@ class BAG(metaclass = ABCMeta):
         """
         run BAG
 
-        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        sample: n * d numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
         k: subsample size
         B: number of subsamples to draw
 
@@ -163,7 +163,7 @@ class ReBAG(BAG):
         evaluate the training objective for a training result on a data set (should be the same as the training objective optimized by self.train)
 
         trainingResult: a training result, e.g., a solution vector (for optimization problems) or a machine learning model (for machine learning problems)
-        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        sample: n * d numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
 
         return the training objective value
         """
@@ -260,7 +260,7 @@ class ReBAG(BAG):
         """
         run ReBAG or ReBAGS
 
-        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        sample: n * d numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
         k1: subsample size for the model candidate retrieval phase
         k2: subsample size for the majority-vote phase
         B1: number of subsamples to draw in the model candidate retrieval phase

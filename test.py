@@ -1,4 +1,4 @@
-from Examples import ReBaggedLRCoef, ReBaggedLRModel
+from Examples import BaggedBinary, ReBaggedLRCoef, ReBaggedLRModel
 import numpy as np
 from multiprocessing import set_start_method
 import os
@@ -22,11 +22,15 @@ if __name__ == "__main__":
     lr = ReBaggedLRCoef(False, numParallelTrain = 4, numParallelEval = 4, randomState = 666)
     tic = time.time()
     output = lr.run(sample, 1000, 1000, 100, 200)
-    print(f"taking {time.time() - tic} secs")
-    print(output)
+    print(f"ReBaggedLRCoef took {time.time() - tic} secs, result: ", output)
 
     lr = ReBaggedLRModel(False, numParallelTrain = 4, numParallelEval = 4, randomState = 666)
     tic = time.time()
     output = lr.run(sample, 1000, 1000, 100, 200)
-    print(f"taking {time.time() - tic} secs")
-    print(output.coef_)
+    print(f" ReBaggedLRModel took {time.time() - tic} secs, result: ", output.coef_)
+
+    binarySample = np.hstack((rngData.normal(loc = 0.1, size = (N, 1)), rngData.normal(loc = 0.0, size = (N, 1))))
+    binary = BaggedBinary(numParallelTrain = 4, randomState = 666)
+    tic = time.time()
+    output = binary.run(binarySample, 1000, 200)
+    print(f"BaggedBinary took {time.time() - tic} secs, result: ", output)
