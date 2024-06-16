@@ -33,7 +33,7 @@ class BAG(metaclass = ABCMeta):
         pass
 
     @abstractmethod
-    def identicalTrainingResults(self, result1: Any, result2: Any) -> bool:
+    def isIdentical(self, result1: Any, result2: Any) -> bool:
         """
         return whether two training results are considered identical
         """
@@ -119,7 +119,7 @@ class BAG(metaclass = ABCMeta):
             index = i
             for j in range(i):
                 if candidateCount[j] > 0:
-                    if self.identicalTrainingResults(trainingResultList[i], trainingResultList[j]):
+                    if self.isIdentical(trainingResultList[i], trainingResultList[j]):
                         index = j
                         break
             
@@ -294,7 +294,7 @@ class ReBAG(BAG):
         for result1 in trainingResults:
             existing = False
             for result2 in retrievedList:
-                if self.identicalTrainingResults(result1, result2):
+                if self.isIdentical(result1, result2):
                     existing = True
                     break
 

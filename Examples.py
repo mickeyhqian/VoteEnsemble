@@ -10,7 +10,7 @@ class BaggedBinary(BAG):
         meanArray = np.mean(sample, axis = 0)
         return np.argmin(meanArray)
     
-    def identicalTrainingResults(self, result1: int, result2: int) -> bool:
+    def isIdentical(self, result1: int, result2: int) -> bool:
         return result1 == result2
 
 
@@ -22,7 +22,7 @@ class ReBaggedLR(ReBAG):
         lr.fit(X, y)
         return lr
     
-    def identicalTrainingResults(self, result1: LinearRegression, result2: LinearRegression) -> bool:
+    def isIdentical(self, result1: LinearRegression, result2: LinearRegression) -> bool:
         return np.max(np.abs(result1.coef_ - result2.coef_)) < 1e-6
     
     @property
