@@ -302,7 +302,7 @@ class ReBAG(BAG):
                 retrievedList.append(result1)
 
         if len(retrievedList) == 0:
-            raise ValueError(f"{self.run.__qualname__}: failed to retrieve any model")
+            raise ValueError(f"{self.run.__qualname__}: failed to retrieve any training result")
         
         evalArray = self._evaluateOnSubsamples(retrievedList, sample2, k2, B2)
         gapMatrix = self._gapMatrix(evalArray)
