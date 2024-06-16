@@ -261,7 +261,7 @@ class ReBAG(BAG):
             gapMatrix = bestObj - evalArray
         return gapMatrix
 
-    def run(self, sample: NDArray, k1: int, k2: int, B1: int, B2: int, epsilon: float, autoEpsilonProb: float = 0.5) -> Any:
+    def run(self, sample: NDArray, k1: int, k2: int, B1: int, B2: int, epsilon: float = -1.0, autoEpsilonProb: float = 0.5) -> Any:
         """
         run ReBAG or ReBAGS
 
@@ -270,7 +270,7 @@ class ReBAG(BAG):
         k2: subsample size for the majority-vote phase
         B1: number of subsamples to draw in the model candidate retrieval phase
         B2: number of subsamples to draw in the majority-vote phase
-        epsilon: the suboptimality threshold, auto-selection applied if < 0
+        epsilon: the suboptimality threshold, auto-selection applied if < 0. Default -1.0
         autoEpsilonProb: the probability threshold guiding the auto-selection of epsilon. Default 0.5
 
         return the bagged training result
