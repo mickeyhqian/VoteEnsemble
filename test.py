@@ -5,7 +5,7 @@ import os
 import time
 
 if __name__ == "__main__":
-    rngData = np.random.default_rng(seed = 668)
+    rngData = np.random.default_rng(seed = 888)
     N = 10000
     d = 10
     XX = rngData.normal(size = (N, d))
