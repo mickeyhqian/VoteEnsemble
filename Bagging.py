@@ -123,21 +123,24 @@ class BAG(metaclass = ABCMeta):
         if len(trainingResults) == 0:
             raise ValueError(f"{self.run.__qualname__}: empty candidate set")
         
-        candidateCount: List[int] = [0 for _ in range(len(trainingResults))]
+        indexCountPairs: List[List[int]] = []
         maxIndex = 0
         maxCount = 0
         for i in range(len(trainingResults)):
-            index = i
-            for j in range(i):
-                if candidateCount[j] > 0:
-                    if self.isIdentical(trainingResults[i], trainingResults[j]):
-                        index = j
-                        break
+            index = len(indexCountPairs)
+            for j in range(len(indexCountPairs)):
+                if self.isIdentical(trainingResults[i], trainingResults[indexCountPairs[j][0]]):
+                    index = j
+                    break
+                    
+            if index < len(indexCountPairs):
+                indexCountPairs[index][1] += 1
+            else:
+                indexCountPairs.append([i, 1])
             
-            candidateCount[index] += 1
-            if candidateCount[index] > maxCount:
-                maxIndex = index
-                maxCount = candidateCount[index]
+            if indexCountPairs[index][1] > maxCount:
+                maxIndex = indexCountPairs[index][0]
+                maxCount = indexCountPairs[index][1]
         
         return trainingResults[maxIndex]
 
