@@ -1,6 +1,7 @@
 from BaggingExamples import ReBaggedLRCoef, ReBaggedLRModel
 import numpy as np
 from multiprocessing import set_start_method
+import os
 import time
 
 if __name__ == "__main__":
@@ -13,7 +14,8 @@ if __name__ == "__main__":
 
     sample = np.hstack((y.reshape(-1, 1), XX))
 
-    set_start_method("fork")
+    if os.name == "posix":
+        set_start_method("fork")
 
     lr = ReBaggedLRCoef(False, numParallelTrain=10, numParallelEval=10, randomState=666)
     tic = time.time()
