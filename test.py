@@ -1,4 +1,4 @@
-from Examples import BaggedBinary, ReBaggedLRCoef, ReBaggedLRModel
+from Examples import BaggedBinary, ReBaggedLR
 import numpy as np
 from multiprocessing import set_start_method
 import os
@@ -19,12 +19,12 @@ if __name__ == "__main__":
     if os.name == "posix":
         set_start_method("fork")
 
-    lr = ReBaggedLRCoef(False, numParallelTrain = 4, numParallelEval = 4, randomState = 666)
+    lr = ReBaggedLR(False, numParallelTrain = 4, numParallelEval = 4, randomState = 666)
     tic = time.time()
     output = lr.run(sample, 1000, 1000, 100, 200)
-    print(f"ReBaggedLRCoef took {time.time() - tic} secs, result: ", output)
+    print(f"ReBaggedLRModel took {time.time() - tic} secs, result: ", output.coef_)
 
-    lr = ReBaggedLRModel(False, numParallelTrain = 4, numParallelEval = 4, randomState = 666)
+    lr.resetRandomState()
     tic = time.time()
     output = lr.run(sample, 1000, 1000, 100, 200)
     print(f"ReBaggedLRModel took {time.time() - tic} secs, result: ", output.coef_)

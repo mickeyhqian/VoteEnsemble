@@ -10,7 +10,7 @@ class BAG(metaclass = ABCMeta):
     def __init__(self, numParallelTrain: int = 1, randomState: Union[np.random.Generator, int, None] = None):
         """
         numParallelTrain: number of processes used for parallel training, <= 1 disables parallel training. Default 1
-        randomState: a random number generator or a seed to be used to initialize a generator. Default None
+        randomState: a random number generator or a seed to be used to initialize a generator. Default None, a random initial state
         """
         if isinstance(randomState, np.random.Generator):
             self._rng = randomState
@@ -18,7 +18,7 @@ class BAG(metaclass = ABCMeta):
             self._rng = np.random.default_rng(seed = randomState)
         else:
             self._rng = np.random.default_rng()
-        self._rngState = self._rng.__getstate__()
+        self._rngState = self._rng.bit_generator.state
         self._numParallelTrain: int = max(1, int(numParallelTrain))
 
     @abstractmethod
@@ -59,7 +59,7 @@ class BAG(metaclass = ABCMeta):
         """
         reset the random number generator to its initial state
         """
-        self._rng.__setstate__(self._rngState)
+        self._rng.bit_generator.state = self._rngState
 
     def _subProcessTrain(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
         for index, subsampleIndices in subsampleList:
@@ -150,7 +150,7 @@ class ReBAG(BAG):
         dataSplit: whether or not (ReBAGS vs ReBAG) to split the data across the model candidate retrieval phase and the majority-vote phase
         numParallelEval: number of processes used for parallel evaluation of training objective, <= 1 disables parallel evaluation. Default 1
         numParallelTrain: number of processes used for parallel training, <= 1 disables parallel training. Default 1
-        randomState: a random number generator or a seed to be used to initialize a generator. Default None
+        randomState: a random number generator or a seed to be used to initialize a generator. Default None, a random initial state
         """
         super().__init__(numParallelTrain = numParallelTrain, randomState = randomState)
         self._dataSplit: bool = dataSplit
