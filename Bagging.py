@@ -20,9 +20,8 @@ class BAG(metaclass = ABCMeta):
             self._rng = np.random.default_rng()
         self._numParallelTrain: int = max(1, numParallelTrain)
 
-    @staticmethod
     @abstractmethod
-    def train(sample: NDArray) -> Any:
+    def train(self, sample: NDArray) -> Any:
         """
         base training algorithm
 
@@ -32,16 +31,14 @@ class BAG(metaclass = ABCMeta):
         """
         pass
 
-    @staticmethod
     @abstractmethod
-    def identicalTrainingOuputs(output1: Any, output2: Any) -> bool:
+    def identicalTrainingOuputs(self, output1: Any, output2: Any) -> bool:
         """
         return whether two training results are considered identical
         """
         pass
 
-    @staticmethod
-    def toPickleable(trainingOutput: Any) -> Any:
+    def toPickleable(self, trainingOutput: Any) -> Any:
         """
         method that transforms a training result to a pickleable object (e.g. basic python types), to be used only if parallel training is enabled (self._numParallelTrain > 1)
 
@@ -49,8 +46,7 @@ class BAG(metaclass = ABCMeta):
         """
         return trainingOutput
 
-    @staticmethod
-    def fromPickleable(pickleableTrainingOutput: Any) -> Any:
+    def fromPickleable(self, pickleableTrainingOutput: Any) -> Any:
         """
         the inverse of toPickleable, to be used only if parallel training is enabled (self._numParallelTrain > 1)
 
@@ -157,13 +153,12 @@ class ReBAG(BAG):
     @abstractmethod
     def isMinimize(self):
         """
-        whether the training problem is a minimization
+        whether or not the training problem is a minimization
         """
         pass
 
-    @staticmethod
     @abstractmethod
-    def evaluate(trainingOutput: Any, sample: NDArray) -> float:
+    def evaluate(self, trainingOutput: Any, sample: NDArray) -> float:
         """
         evaluate the training objective for a training result on a data set (must be consistent with the training objective optimized by self.train)
 
