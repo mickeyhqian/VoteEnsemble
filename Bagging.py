@@ -41,20 +41,22 @@ class BAG(metaclass = ABCMeta):
         pass
 
     @staticmethod
-    @abstractmethod
-    def toPickleble(trainingOutput: Any) -> Any:
+    def toPickleable(trainingOutput: Any) -> Any:
         """
         method that transforms a training result to a pickleable object (e.g. basic python types), to be used only if parallel training is enabled (self._numParallelTrain > 1)
+
+        The default implementation directly returns trainingOutput, and is to be overridden if trainingOutput is not pickleable
         """
-        pass
+        return trainingOutput
 
     @staticmethod
-    @abstractmethod
     def fromPickleable(pickleableTrainingOutput: Any) -> Any:
         """
-        the inverse of self.toPickleable, to be used only if parallel training is enabled (self._numParallelTrain > 1)
+        the inverse of toPickleable, to be used only if parallel training is enabled (self._numParallelTrain > 1)
+
+        Similar to toPickleable, the default implementation directly returns pickleableTrainingOutput, and is to be overridden if the original trainingOutput is not pickleable
         """
-        pass
+        return pickleableTrainingOutput
 
     def _subProcessTrain(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
         for index, subsampleIndices in subsampleList:
@@ -62,7 +64,7 @@ class BAG(metaclass = ABCMeta):
             if trainingOutput is None:
                 queue.put((index, trainingOutput))
             else:
-                queue.put((index, self.toPickleble(trainingOutput)))
+                queue.put((index, self.toPickleable(trainingOutput)))
 
     def _trainOnSubsamples(self, sample: NDArray, k: int, B: int) -> List:
         if B <= 0:
@@ -203,7 +205,7 @@ class ReBAG(BAG):
                     evalOutputList[index] = objectiveList
         else:
             queue = Queue()
-            pickleableList = [self.toPickleble(candidate) for candidate in candidateList]
+            pickleableList = [self.toPickleable(candidate) for candidate in candidateList]
             processList: List[Process] = [Process(target = self._subProcessEvaluate, args = (pickleableList, sample, subsampleList, queue), daemon = True) for subsampleList in subsampleLists]
             
             for process in processList:
