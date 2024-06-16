@@ -26,7 +26,7 @@ class BAG(metaclass = ABCMeta):
         """
         base training algorithm
 
-        sample: n * d numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
 
         return a training result of any type, e.g., a solution scaler/vector (for optimization problems) or a machine learning model (for machine learning problems)
         """
@@ -134,7 +134,7 @@ class BAG(metaclass = ABCMeta):
         """
         run BAG
 
-        sample: n * d numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
         k: subsample size
         B: number of subsamples to draw
 
@@ -170,7 +170,7 @@ class ReBAG(BAG):
         evaluate the training objective for a training result on a data set (should be the same as the training objective optimized by self.train)
 
         trainingResult: a training result, e.g., a solution vector (for optimization problems) or a machine learning model (for machine learning problems)
-        sample: n * d numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
 
         return the training objective value
         """
@@ -267,7 +267,7 @@ class ReBAG(BAG):
         """
         run ReBAG or ReBAGS
 
-        sample: n * d numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
+        sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
         k1: subsample size for the model candidate retrieval phase
         k2: subsample size for the majority-vote phase
         B1: number of subsamples to draw in the model candidate retrieval phase
