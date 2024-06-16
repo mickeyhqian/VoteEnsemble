@@ -151,7 +151,7 @@ class ReBAG(BAG):
 
     @property
     @abstractmethod
-    def isMinimize(self):
+    def isMinimization(self):
         """
         whether or not the training problem is a minimization
         """
@@ -248,7 +248,7 @@ class ReBAG(BAG):
         return right
     
     def _gapMatrix(self, evalArray: NDArray) -> NDArray:
-        if self.isMinimize:
+        if self.isMinimization:
             bestObj = evalArray.min(axis = 1, keepdims = True)
             gapMatrix = evalArray - bestObj
         else:

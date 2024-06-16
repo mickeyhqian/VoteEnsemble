@@ -17,7 +17,7 @@ class ReBaggedLRCoef(ReBAG):
         return np.max(np.abs(output1 - output2)) < 1e-6
     
     @property
-    def isMinimize(self):
+    def isMinimization(self):
         return True
     
     def evaluate(self, trainingOutput: Any, sample: NDArray) -> float:
@@ -37,7 +37,7 @@ class ReBaggedLRModel(ReBAG):
         return np.max(np.abs(output1.coef_ - output2.coef_)) < 1e-6
     
     @property
-    def isMinimize(self):
+    def isMinimization(self):
         return True
     
     def evaluate(self, trainingOutput: LinearRegression, sample: NDArray) -> float:
