@@ -4,7 +4,7 @@ import time
 
 if __name__ == "__main__":
     rng = np.random.default_rng(seed=666)
-    lr = ReBaggedLR(False, numParallelTrain=10, numParallelEval=5, randomState=rng)
+    lr = ReBaggedLR(False, numParallelTrain=10, numParallelEval=10, randomState=rng)
 
     rngData = np.random.default_rng(seed=668)
     N = 10000
