@@ -2,12 +2,12 @@ from abc import abstractmethod, ABCMeta
 import numpy as np
 from numpy.typing import NDArray
 from multiprocessing import Process, Queue
-from typing import List, Any, Tuple
+from typing import List, Any, Tuple, Union
 
 
 
 class BAG(metaclass = ABCMeta):
-    def __init__(self, numParallelTrain: int = 1, randomState: np.random.Generator | int | None = None):
+    def __init__(self, numParallelTrain: int = 1, randomState: Union[np.random.Generator, int, None] = None):
         """
         numParallelTrain: number of processes used for parallel training, <= 1 disables parallel training. Default 1
         randomState: a random number generator or a seed to be used to initialize a generator. Default None
@@ -142,7 +142,7 @@ class BAG(metaclass = ABCMeta):
 
 
 class ReBAG(BAG):
-    def __init__(self, dataSplit: bool, numParallelEval: int = 1, numParallelTrain: int = 1, randomState: np.random.Generator | int | None = None):
+    def __init__(self, dataSplit: bool, numParallelEval: int = 1, numParallelTrain: int = 1, randomState: Union[np.random.Generator, int, None] = None):
         """
         dataSplit: whether or not (ReBAGS vs ReBAG) to split the data across the model candidate retrieval phase and the majority-vote phase
         numParallelEval: number of processes used for parallel evaluation of training objective, <= 1 disables parallel evaluation. Default 1
