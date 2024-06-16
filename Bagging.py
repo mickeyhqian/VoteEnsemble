@@ -18,7 +18,7 @@ class BAG(metaclass = ABCMeta):
             self._rng = np.random.default_rng(seed = randomState)
         else:
             self._rng = np.random.default_rng()
-        self._numParallelTrain: int = max(1, numParallelTrain)
+        self._numParallelTrain: int = max(1, int(numParallelTrain))
 
     @abstractmethod
     def train(self, sample: NDArray) -> Any:
@@ -32,35 +32,35 @@ class BAG(metaclass = ABCMeta):
         pass
 
     @abstractmethod
-    def identicalTrainingOuputs(self, output1: Any, output2: Any) -> bool:
+    def identicalTrainingResults(self, result1: Any, result2: Any) -> bool:
         """
         return whether two training results are considered identical
         """
         pass
 
-    def toPickleable(self, trainingOutput: Any) -> Any:
+    def toPickleable(self, trainingResult: Any) -> Any:
         """
         method that transforms a training result to a pickleable object (e.g. basic python types), to be used only if parallel training is enabled (self._numParallelTrain > 1)
 
-        The default implementation directly returns trainingOutput, and is to be overridden if trainingOutput is not pickleable
+        The default implementation directly returns trainingResult, and is to be overridden if trainingResult is not pickleable
         """
-        return trainingOutput
+        return trainingResult
 
-    def fromPickleable(self, pickleableTrainingOutput: Any) -> Any:
+    def fromPickleable(self, pickleableTrainingResult: Any) -> Any:
         """
         the inverse of toPickleable, to be used only if parallel training is enabled (self._numParallelTrain > 1)
 
-        Similar to toPickleable, the default implementation directly returns pickleableTrainingOutput, and is to be overridden if the original trainingOutput is not pickleable
+        Similar to toPickleable, the default implementation directly returns pickleableTrainingResult, and is to be overridden if the original trainingResult is not pickleable
         """
-        return pickleableTrainingOutput
+        return pickleableTrainingResult
 
     def _subProcessTrain(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
         for index, subsampleIndices in subsampleList:
-            trainingOutput = self.train(sample[subsampleIndices])
-            if trainingOutput is None:
-                queue.put((index, trainingOutput))
+            trainingResult = self.train(sample[subsampleIndices])
+            if trainingResult is None:
+                queue.put((index, trainingResult))
             else:
-                queue.put((index, self.toPickleable(trainingOutput)))
+                queue.put((index, self.toPickleable(trainingResult)))
 
     def _trainOnSubsamples(self, sample: NDArray, k: int, B: int) -> List:
         if B <= 0:
@@ -78,12 +78,12 @@ class BAG(metaclass = ABCMeta):
             subsampleLists[processIndex].append((b, newSubsample.tolist()))
             processIndex = (processIndex + 1) % self._numParallelTrain
 
-        trainingOutputList: List = [None for _ in range(B)]
+        trainingResultList: List = [None for _ in range(B)]
 
         if len(subsampleLists) <= 1:
             for subsampleList in subsampleLists:
                 for index, subsampleIndices in subsampleList:
-                    trainingOutputList[index] = self.train(sample[subsampleIndices])
+                    trainingResultList[index] = self.train(sample[subsampleIndices])
         else:
             queue = Queue()
             processList: List[Process] = [Process(target = self._subProcessTrain, args = (sample, subsampleList, queue), daemon = True) for subsampleList in subsampleLists]
@@ -92,27 +92,27 @@ class BAG(metaclass = ABCMeta):
                 process.start()
 
             for _ in range(B):
-                index, trainingOutput = queue.get()
-                if trainingOutput is not None:
-                    trainingOutputList[index] = self.fromPickleable(trainingOutput)
+                index, trainingResult = queue.get()
+                if trainingResult is not None:
+                    trainingResultList[index] = self.fromPickleable(trainingResult)
 
             for process in processList:
                 process.join()
 
-        return [entry for entry in trainingOutputList if entry is not None]
+        return [entry for entry in trainingResultList if entry is not None]
 
-    def _majorityVote(self, trainingOutputList: List) -> Any:
-        if len(trainingOutputList) == 0:
+    def _majorityVote(self, trainingResultList: List) -> Any:
+        if len(trainingResultList) == 0:
             raise ValueError(f"{self._majorityVote.__qualname__}: empty candidate set")
         
-        candidateCount: List[int] = [0 for _ in range(len(trainingOutputList))]
+        candidateCount: List[int] = [0 for _ in range(len(trainingResultList))]
         maxIndex = -1
         maxCount = -1
-        for i in range(len(trainingOutputList)):
+        for i in range(len(trainingResultList)):
             index = i
             for j in range(i):
                 if candidateCount[j] > 0:
-                    if self.identicalTrainingOuputs(trainingOutputList[i], trainingOutputList[j]):
+                    if self.identicalTrainingResults(trainingResultList[i], trainingResultList[j]):
                         index = j
                         break
             
@@ -121,7 +121,7 @@ class BAG(metaclass = ABCMeta):
                 maxIndex = index
                 maxCount = candidateCount[index]
         
-        return trainingOutputList[maxIndex]
+        return trainingResultList[maxIndex]
         
     def run(self, sample: NDArray, k: int, B: int) -> Any:
         """
@@ -133,8 +133,8 @@ class BAG(metaclass = ABCMeta):
 
         return the bagged training result
         """
-        trainingOutputs = self._trainOnSubsamples(np.asarray(sample), k, B)
-        return self._majorityVote(trainingOutputs)
+        trainingResults = self._trainOnSubsamples(np.asarray(sample), k, B)
+        return self._majorityVote(trainingResults)
 
 
 class ReBAG(BAG):
@@ -147,7 +147,7 @@ class ReBAG(BAG):
         """
         super().__init__(numParallelTrain = numParallelTrain, randomState = randomState)
         self._dataSplit: bool = dataSplit
-        self._numParallelEval: int = max(1, numParallelEval)
+        self._numParallelEval: int = max(1, int(numParallelEval))
 
     @property
     @abstractmethod
@@ -158,11 +158,11 @@ class ReBAG(BAG):
         pass
 
     @abstractmethod
-    def evaluate(self, trainingOutput: Any, sample: NDArray) -> float:
+    def evaluate(self, trainingResult: Any, sample: NDArray) -> float:
         """
-        evaluate the training objective for a training result on a data set (must be consistent with the training objective optimized by self.train)
+        evaluate the training objective for a training result on a data set (should be the same as the training objective optimized by self.train)
 
-        trainingOutput: a training result, e.g., a solution vector (for optimization problems) or a machine learning model (for machine learning problems)
+        trainingResult: a training result, e.g., a solution vector (for optimization problems) or a machine learning model (for machine learning problems)
         sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
 
         return the training objective value
@@ -265,7 +265,7 @@ class ReBAG(BAG):
         k2: subsample size for the majority-vote phase
         B1: number of subsamples to draw in the model candidate retrieval phase
         B2: number of subsamples to draw in the majority-vote phase
-        epsilon: the suboptimality threshold, auto-selection applied if < 0. Default -1.0
+        epsilon: the suboptimality threshold, auto-selection applied if < 0. Default -1.0, i.e., auto-selection
         autoEpsilonProb: the probability threshold guiding the auto-selection of epsilon. Default 0.5
 
         return the bagged training result
@@ -281,18 +281,18 @@ class ReBAG(BAG):
             sample1 = sample[:n1]
             sample2 = sample[n1:]
 
-        trainingOutputs = self._trainOnSubsamples(sample1, k1, B1)
+        trainingResults = self._trainOnSubsamples(sample1, k1, B1)
 
         retrievedList: List = []
-        for output1 in trainingOutputs:
+        for result1 in trainingResults:
             existing = False
-            for output2 in retrievedList:
-                if self.identicalTrainingOuputs(output1, output2):
+            for result2 in retrievedList:
+                if self.identicalTrainingResults(result1, result2):
                     existing = True
                     break
 
             if not existing:
-                retrievedList.append(output1)
+                retrievedList.append(result1)
 
         if len(retrievedList) == 0:
             raise ValueError(f"{self.run.__qualname__}: failed to retrieve any model")
