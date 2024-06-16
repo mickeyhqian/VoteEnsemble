@@ -107,28 +107,6 @@ class BAG(metaclass = ABCMeta):
                 process.join()
 
         return [entry for entry in trainingResultList if entry is not None]
-
-    def _majorityVote(self, trainingResultList: List) -> Any:
-        if len(trainingResultList) == 0:
-            raise ValueError(f"{self._majorityVote.__qualname__}: empty candidate set")
-        
-        candidateCount: List[int] = [0 for _ in range(len(trainingResultList))]
-        maxIndex = -1
-        maxCount = -1
-        for i in range(len(trainingResultList)):
-            index = i
-            for j in range(i):
-                if candidateCount[j] > 0:
-                    if self.isIdentical(trainingResultList[i], trainingResultList[j]):
-                        index = j
-                        break
-            
-            candidateCount[index] += 1
-            if candidateCount[index] > maxCount:
-                maxIndex = index
-                maxCount = candidateCount[index]
-        
-        return trainingResultList[maxIndex]
         
     def run(self, sample: NDArray, k: int, B: int) -> Any:
         """
@@ -141,7 +119,27 @@ class BAG(metaclass = ABCMeta):
         return the bagged training result
         """
         trainingResults = self._trainOnSubsamples(np.asarray(sample), k, B)
-        return self._majorityVote(trainingResults)
+
+        if len(trainingResults) == 0:
+            raise ValueError(f"{self.run.__qualname__}: empty candidate set")
+        
+        candidateCount: List[int] = [0 for _ in range(len(trainingResults))]
+        maxIndex = 0
+        maxCount = 0
+        for i in range(len(trainingResults)):
+            index = i
+            for j in range(i):
+                if candidateCount[j] > 0:
+                    if self.isIdentical(trainingResults[i], trainingResults[j]):
+                        index = j
+                        break
+            
+            candidateCount[index] += 1
+            if candidateCount[index] > maxCount:
+                maxIndex = index
+                maxCount = candidateCount[index]
+        
+        return trainingResults[maxIndex]
 
 
 class ReBAG(BAG):
@@ -185,7 +183,7 @@ class ReBAG(BAG):
     def _evaluateOnSubsamples(self, candidateList: List, sample: NDArray, k: int, B: int) -> NDArray:
         if B <= 0:
             raise ValueError(f"{self._evaluateOnSubsamples.__qualname__}: B = {B} <= 0")
-        n: int = len(sample)
+        n = len(sample)
         if n < k:
             raise ValueError(f"{self._evaluateOnSubsamples.__qualname__}: n = {n} < k = {k}")
         
