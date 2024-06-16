@@ -28,7 +28,7 @@ class BAG(metaclass = ABCMeta):
 
         sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
 
-        return a training result of any type, e.g., a solution scaler/vector (for optimization problems) or a machine learning model (for machine learning problems)
+        return a training result of any type, e.g., a solution scalar/vector (for optimization problems) or a machine learning model (for machine learning problems)
         """
         pass
 
@@ -169,7 +169,7 @@ class ReBAG(BAG):
         """
         evaluate the training objective for a training result on a data set (should be the same as the training objective optimized by self.train)
 
-        trainingResult: a training result, e.g., a solution scaler/vector (for optimization problems) or a machine learning model (for machine learning problems)
+        trainingResult: a training result, e.g., a solution scalar/vector (for optimization problems) or a machine learning model (for machine learning problems)
         sample: numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point
 
         return the training objective value
