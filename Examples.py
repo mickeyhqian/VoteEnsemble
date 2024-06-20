@@ -1,27 +1,13 @@
-from Bagging import BAG, ReBAG
+from Bagging import BaseAlgorithm
 from sklearn.linear_model import LinearRegression
 import numpy as np
 from numpy.typing import NDArray
 import cvxpy as cp
-from typing import Union
 
-
-
-class BagBinary(BAG):
-    def train(self, sample: NDArray) -> int:
-        meanArray = np.mean(sample, axis = 0)
-        return np.argmin(meanArray)
-    
-    def isIdentical(self, result1: int, result2: int) -> bool:
-        return result1 == result2
-    
-    def genSample(self, n: int, rng: np.random.Generator) -> NDArray:
-        return np.hstack((rng.normal(loc = 0.1, size = (n, 1)), rng.normal(loc = 0.0, size = (n, 1))))
     
 
-class BagLP(BAG):
-    def __init__(self, c: NDArray, A: NDArray, b: NDArray, lb: NDArray, ub: NDArray, numParallelTrain: int = 1, randomState: Union[np.random.Generator, int, None] = None):
-        super().__init__(numParallelTrain, randomState)
+class BaseLP(BaseAlgorithm):
+    def __init__(self, c: NDArray, A: NDArray, b: NDArray, lb: NDArray, ub: NDArray):
         self._c: NDArray = np.asarray(c)
         self._A: NDArray = np.asarray(A)
         self._b: NDArray = np.asarray(b)
@@ -39,12 +25,19 @@ class BagLP(BAG):
     
     def isIdentical(self, result1: NDArray, result2: NDArray) -> bool:
         return np.max(np.abs(result1 - result2)) < 1e-6
+
+    @property
+    def isMinimization(self):
+        return True
+
+    def evaluate(self, trainingResult: NDArray, sample: NDArray) -> float:
+        return np.dot(np.mean(sample, axis = 0), trainingResult)
     
     def genSample(self, n: int, rng: np.random.Generator) -> NDArray:
         return rng.normal(loc = self._c, size = (n, len(self._c)))
 
 
-class ReBagLR(ReBAG):
+class BaseLR(BaseAlgorithm):
     def train(self, sample: NDArray) -> LinearRegression:
         y = sample[:,0]
         X = sample[:,1:]
