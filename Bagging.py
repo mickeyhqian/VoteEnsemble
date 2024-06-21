@@ -26,7 +26,7 @@ class BaseTrainer(metaclass = ABCMeta):
     @abstractmethod
     def enableDeduplication(self):
         """
-        Property of whether or not to deduplicate training results on subsamples using the self.isDuplicate method.
+        Property of whether or not to deduplicate training results from subsamples using the self.isDuplicate method.
 
         Use with BAG and ReBAG:
 
