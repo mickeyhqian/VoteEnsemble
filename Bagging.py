@@ -97,10 +97,9 @@ class BAG:
     def _subProcessTrain(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
         for index, subsampleIndices in subsampleList:
             trainingResult = self._baseAlgo.train(sample[subsampleIndices])
-            if trainingResult is None:
-                queue.put((index, trainingResult))
-            else:
-                queue.put((index, self._baseAlgo.toPickleable(trainingResult)))
+            if trainingResult is not None:
+                trainingResult = self._baseAlgo.toPickleable(trainingResult)
+            queue.put((index, trainingResult))
 
     def _trainOnSubsamples(self, sample: NDArray, k: int, B: int) -> List:
         if B <= 0:
