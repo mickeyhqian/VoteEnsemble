@@ -1,4 +1,4 @@
-from Bagging import BaseAlgorithm
+from Bagging import BaseTrainer
 from sklearn.linear_model import LinearRegression
 import numpy as np
 from numpy.typing import NDArray
@@ -6,7 +6,7 @@ import cvxpy as cp
 
     
 
-class BaseLP(BaseAlgorithm):
+class BaseLP(BaseTrainer):
     def __init__(self, c: NDArray, A: NDArray, b: NDArray, lb: NDArray, ub: NDArray):
         self._c: NDArray = np.asarray(c)
         self._A: NDArray = np.asarray(A)
@@ -23,36 +23,44 @@ class BaseLP(BaseAlgorithm):
         if prob.status == "optimal":
             return x.value
     
-    def isIdentical(self, result1: NDArray, result2: NDArray) -> bool:
+    @property
+    def enableDeduplication(self):
+        return True
+    
+    def isDuplicate(self, result1: NDArray, result2: NDArray) -> bool:
         return np.max(np.abs(result1 - result2)) < 1e-6
 
     @property
     def isMinimization(self):
         return True
 
-    def evaluate(self, trainingResult: NDArray, sample: NDArray) -> float:
+    def objective(self, trainingResult: NDArray, sample: NDArray) -> float:
         return np.dot(np.mean(sample, axis = 0), trainingResult)
     
     def genSample(self, n: int, rng: np.random.Generator) -> NDArray:
         return rng.normal(loc = self._c, size = (n, len(self._c)))
 
 
-class BaseLR(BaseAlgorithm):
+class BaseLR(BaseTrainer):
     def train(self, sample: NDArray) -> LinearRegression:
         y = sample[:,0]
         X = sample[:,1:]
         lr = LinearRegression(fit_intercept = False)
         lr.fit(X, y)
         return lr
+
+    @property
+    def enableDeduplication(self):
+        return False
     
-    def isIdentical(self, result1: LinearRegression, result2: LinearRegression) -> bool:
-        return np.max(np.abs(result1.coef_ - result2.coef_)) < 1e-6
+    def isDuplicate(self):
+        pass
     
     @property
     def isMinimization(self):
         return True
     
-    def evaluate(self, trainingResult: LinearRegression, sample: NDArray) -> float:
+    def objective(self, trainingResult: LinearRegression, sample: NDArray) -> float:
         error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
         return np.mean(error ** 2)
     
