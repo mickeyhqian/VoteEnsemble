@@ -2,14 +2,12 @@ from Bagging import BAG, ReBAG
 from BaseTrainers import BaseLP
 import numpy as np
 from multiprocessing import set_start_method
-import os
 import time
 
 
 
 if __name__ == "__main__":
-    if os.name == "posix":
-        set_start_method("fork")
+    set_start_method("spawn")
         
     rngData = np.random.default_rng(seed = 888)
 
@@ -24,17 +22,17 @@ if __name__ == "__main__":
     c = -rngLP.uniform(low=0, high=1, size=d)
     sample = rngData.normal(loc = c, size = (10000, len(c)))
 
-    bagLP = BAG(lp, numParallelTrain = 1, randomState = 666)
+    bagLP = BAG(lp, randomState = 666)
     tic = time.time()
     output = bagLP.run(sample, 500, 200)
     print(f"BAG took {time.time() - tic} secs, result: ", output)
 
-    rebagLP = ReBAG(lp, False, numParallelEval = 12, numParallelTrain = 1, randomState = 666)
+    rebagLP = ReBAG(lp, False, randomState = 666)
     tic = time.time()
     output = rebagLP.run(sample, 1000, 500, 50, 200)
     print(f"ReBAG took {time.time() - tic} secs, result: ", output)
 
-    rebagsLP = ReBAG(lp, True, numParallelEval = 12, numParallelTrain = 1, randomState = 666)
+    rebagsLP = ReBAG(lp, True, randomState = 666)
     tic = time.time()
     output = rebagsLP.run(sample, 1000, 500, 50, 200)
     print(f"ReBAGS took {time.time() - tic} secs, result: ", output)

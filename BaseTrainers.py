@@ -59,3 +59,45 @@ class BaseLR(BaseTrainer):
     def objective(self, trainingResult: LinearRegression, sample: NDArray) -> float:
         error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
         return np.mean(error ** 2)
+
+
+class BasePortfolio(BaseTrainer):
+    def __init__(self, mu: NDArray, b: float):
+        self._mu: NDArray = mu
+        self._b: float = b
+
+    def train(self, sample: NDArray) -> NDArray:
+        k, m = sample.shape
+        sampleCentered = sample - self._mu.reshape(1, -1)
+        covMatrix = np.dot(sampleCentered.T, sampleCentered) / k
+
+        x = cp.Variable(m)
+        objective = cp.Minimize(cp.quad_form(x, covMatrix))
+        constraints = [self._mu @ x >= self._b, cp.sum(x) == 1, x >= 0]
+
+        # Formulate the problem
+        problem = cp.Problem(objective, constraints)
+
+        problem.solve(solver="SCS")
+
+        if problem.status == "optimal":
+            return x.value
+
+    @property
+    def enableDeduplication(self):
+        return False
+
+    def isDuplicate(self):
+        pass
+
+    @property
+    def isMinimization(self):
+        return True
+
+    def objective(self, trainingResult: NDArray, sample: NDArray) -> float:
+        try:
+            sampleCentered = sample - self._mu.reshape(1, -1)
+            covMatrix = np.dot(sampleCentered.T, sampleCentered) / len(sample)
+            return np.dot(np.dot(covMatrix, trainingResult), trainingResult)
+        except:
+            return None

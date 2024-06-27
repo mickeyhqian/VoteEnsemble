@@ -5,14 +5,12 @@ from numpy.typing import NDArray
 from multiprocessing import set_start_method
 from scipy import stats
 from sklearn.linear_model import LinearRegression
-import os
 from uuid import uuid4
 
 
 
 if __name__ == "__main__":
-    if os.name == "posix":
-        set_start_method("fork")
+    set_start_method("spawn")
 
     rngData = np.random.default_rng(seed = 888)
     rngProb = np.random.default_rng(seed = 999)
