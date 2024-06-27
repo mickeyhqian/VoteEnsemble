@@ -16,7 +16,9 @@ def runTraining(baseTrainer: BaseTrainer,
                 BList: List[int], 
                 k12List: List[Tuple[Tuple[int, float], Tuple[int, float]]], 
                 B12List: List[Tuple[int, int]], 
-                numReplicates: int):
+                numReplicates: int,
+                numParallelTrain: int = 1,
+                numParallelEval: int = 1):
     baseList = [[] for _ in range(len(sampleSizeList))]
     BAGList = [[[[] for _ in range(len(sampleSizeList))] for _ in range(len(kList))] for _ in range(len(BList))]
     ReBAGList = [[[[] for _ in range(len(sampleSizeList))] for _ in range(len(k12List))] for _ in range(len(B12List))]
@@ -37,7 +39,7 @@ def runTraining(baseTrainer: BaseTrainer,
             for ind1, B in enumerate(BList):
                 for ind2, (base, ratio) in enumerate(kList):
                     k = max(base, int(n * ratio))
-                    bag = BAG(baseTrainer, numParallelTrain = 1, randomState = 666)
+                    bag = BAG(baseTrainer, numParallelTrain = numParallelTrain, randomState = 666)
 
                     tic = time.time()
                     BAGList[ind1][ind2][i].append(baseTrainer.toPickleable(bag.run(sample, k, B)))
@@ -47,7 +49,7 @@ def runTraining(baseTrainer: BaseTrainer,
                 for ind2, ((base1, ratio1), (base2, ratio2)) in enumerate(k12List):
                     k1 = max(base1, int(n * ratio1))
                     k2 = max(base2, int(n * ratio2))
-                    rebag = ReBAG(baseTrainer, False, numParallelEval = 12, numParallelTrain = 1, randomState = 666)
+                    rebag = ReBAG(baseTrainer, False, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666)
                     
                     tic = time.time()
                     ReBAGList[ind1][ind2][i].append(baseTrainer.toPickleable(rebag.run(sample, k1, k2, B1, B2)))
@@ -57,7 +59,7 @@ def runTraining(baseTrainer: BaseTrainer,
                 for ind2, ((base1, ratio1), (base2, ratio2)) in enumerate(k12List):
                     k1 = max(base1, int(n / 2 * ratio1))
                     k2 = max(base2, int(n / 2 * ratio2))
-                    rebags = ReBAG(baseTrainer, True, numParallelEval = 12, numParallelTrain = 1, randomState = 666)
+                    rebags = ReBAG(baseTrainer, True, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666)
 
                     tic = time.time()
                     ReBAGSList[ind1][ind2][i].append(baseTrainer.toPickleable(rebags.run(sample, k1, k2, B1, B2)))
@@ -287,7 +289,9 @@ def pipeline(caseName: str,
              BList: List, 
              k12List: List, 
              B12List: List, 
-             numReplicates: int):
+             numReplicates: int,
+             numParallelTrain: int = 1,
+             numParallelEval: int = 1):
     baseList, BAGList, ReBAGList, ReBAGSList = runTraining(baseTrainer, 
                                                            sampler,
                                                            sampleSizeList, 
@@ -295,7 +299,9 @@ def pipeline(caseName: str,
                                                            BList, 
                                                            k12List, 
                                                            B12List, 
-                                                           numReplicates)
+                                                           numReplicates,
+                                                           numParallelTrain = numParallelTrain,
+                                                           numParallelEval = numParallelEval)
     scriptDir = os.path.dirname(__file__)
     trainingResultFile = f"{scriptDir}/ExpData/{caseName}/{expID}/trainingResults.pkl"
     dumpTrainingResults(baseList, 
