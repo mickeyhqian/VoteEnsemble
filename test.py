@@ -22,10 +22,7 @@ if __name__ == "__main__":
     lp = BaseLP(A, b, lb, ub)
 
     c = -rngLP.uniform(low=0, high=1, size=d)
-    def sampler(n: int):
-        return rngData.normal(loc = c, size = (n, len(c)))
-
-    sample = sampler(10000)
+    sample = rngData.normal(loc = c, size = (10000, len(c)))
 
     bagLP = BAG(lp, numParallelTrain = 1, randomState = 666)
     tic = time.time()
