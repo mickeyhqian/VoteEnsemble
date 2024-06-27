@@ -24,8 +24,8 @@ if __name__ == "__main__":
     kList = []
     BList = []
     k12List = [((30, 0.5), (30, 0.005))]
-    B12List = [(100, 200)]
-    numReplicates = 50
+    B12List = [(50, 200)]
+    numReplicates = 10
     sampleSizeList = [2**i for i in range(10, 15)]
 
     def sampler(n: int):
@@ -59,7 +59,8 @@ if __name__ == "__main__":
                         trainingResultFile)
     
 
-    baseObjList, BAGObjList, ReBAGObjList, ReBAGSObjList, baseObjAvg, BAGObjAvg, ReBAGObjAvg, ReBAGSObjAvg = runEvaluation(baseList, 
+    baseObjList, BAGObjList, ReBAGObjList, ReBAGSObjList, baseObjAvg, BAGObjAvg, ReBAGObjAvg, ReBAGSObjAvg = runEvaluation(lr,
+                                                                                                                           baseList, 
                                                                                                                            BAGList, 
                                                                                                                            ReBAGList, 
                                                                                                                            ReBAGSList, 

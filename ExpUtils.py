@@ -28,7 +28,10 @@ def runTraining(baseTrainer: BaseTrainer,
             sample = sampler(n)
             
             tic = time.time()
-            baseList[i].append(baseTrainer.train(sample))
+            baseResult = baseTrainer.train(sample)
+            if baseResult is None:
+                raise RuntimeError(f"base training failed for sample size {n}, replication {j}")
+            baseList[i].append(baseTrainer.toPickleable(baseResult))
             print(f"Finish base training for sample size {n}, replication {j}, taking {time.time()-tic} secs")
 
             for ind1, B in enumerate(BList):
@@ -37,7 +40,7 @@ def runTraining(baseTrainer: BaseTrainer,
                     bag = BAG(baseTrainer, numParallelTrain = 1, randomState = 666)
 
                     tic = time.time()
-                    BAGList[ind1][ind2][i].append(bag.run(sample, k, B))
+                    BAGList[ind1][ind2][i].append(baseTrainer.toPickleable(bag.run(sample, k, B)))
                     print(f"Finish BAG training for sample size {n}, replication {j}, B={B}, k={k}, taking {time.time()-tic} secs")
 
             for ind1, (B1, B2) in enumerate(B12List):
@@ -47,7 +50,7 @@ def runTraining(baseTrainer: BaseTrainer,
                     rebag = ReBAG(baseTrainer, False, numParallelEval = 12, numParallelTrain = 1, randomState = 666)
                     
                     tic = time.time()
-                    ReBAGList[ind1][ind2][i].append(rebag.run(sample, k1, k2, B1, B2))
+                    ReBAGList[ind1][ind2][i].append(baseTrainer.toPickleable(rebag.run(sample, k1, k2, B1, B2)))
                     print(f"Finish ReBAG training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}, taking {time.time()-tic} secs")
 
             for ind1, (B1, B2) in enumerate(B12List):
@@ -57,13 +60,14 @@ def runTraining(baseTrainer: BaseTrainer,
                     rebags = ReBAG(baseTrainer, True, numParallelEval = 12, numParallelTrain = 1, randomState = 666)
 
                     tic = time.time()
-                    ReBAGSList[ind1][ind2][i].append(rebags.run(sample, k1, k2, B1, B2))
+                    ReBAGSList[ind1][ind2][i].append(baseTrainer.toPickleable(rebags.run(sample, k1, k2, B1, B2)))
                     print(f"Finish ReBAGS training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}, taking {time.time()-tic} secs")
 
     return baseList, BAGList, ReBAGList, ReBAGSList
 
 
-def runEvaluation(baseList: List, 
+def runEvaluation(baseTrainer: BaseTrainer, 
+                  baseList: List, 
                   BAGList: List, 
                   ReBAGList: List, 
                   ReBAGSList: List, 
@@ -86,16 +90,16 @@ def runEvaluation(baseList: List,
 
     for i in range(len(sampleSizeList)):
         for j in range(numReplicates):
-            baseObjList[i].append(evaluator(baseList[i][j]))
+            baseObjList[i].append(evaluator(baseTrainer.fromPickleable(baseList[i][j])))
 
             for ind1 in range(len(BList)):
                 for ind2 in range(len(kList)):
-                    BAGObjList[ind1][ind2][i].append(evaluator(BAGList[ind1][ind2][i][j]))
+                    BAGObjList[ind1][ind2][i].append(evaluator(baseTrainer.fromPickleable(BAGList[ind1][ind2][i][j])))
 
             for ind1 in range(len(B12List)):
                 for ind2 in range(len(k12List)):
-                    ReBAGObjList[ind1][ind2][i].append(evaluator(ReBAGList[ind1][ind2][i][j]))
-                    ReBAGSObjList[ind1][ind2][i].append(evaluator(ReBAGSList[ind1][ind2][i][j]))
+                    ReBAGObjList[ind1][ind2][i].append(evaluator(baseTrainer.fromPickleable(ReBAGList[ind1][ind2][i][j])))
+                    ReBAGSObjList[ind1][ind2][i].append(evaluator(baseTrainer.fromPickleable(ReBAGSList[ind1][ind2][i][j])))
     
         if len(baseObjList[i]) > 0:
             baseObjAvg.append(np.mean(baseObjList[i]))
@@ -219,7 +223,7 @@ def plotCDF(baseObjList: List,
             k12List: List, 
             B12List: List,
             filePath: str):
-    fig, ax = plt.subplots(nrows=len(sampleSizeList), figsize=(4, len(sampleSizeList) * 3))
+    fig, ax = plt.subplots(nrows=len(sampleSizeList), figsize=(6, len(sampleSizeList) * 4))
 
     def getCDF(sequence):
         xList = []
@@ -263,7 +267,11 @@ def plotCDF(baseObjList: List,
 
         ax[i].set_ylabel('tail prob')
         ax[i].set_yscale('log')
-        ax[i].set_title(f'sample size = {sampleSizeList[i]}')
-        ax[i].legend(fontsize = 'small')
-        
+        ax[i].set_title(f'sample size = {sampleSizeList[i]}', fontsize = "medium")
+
+    # Create a legend using the first subplot
+    handles, labels = ax[0].get_legend_handles_labels()
+
+    # Place the combined legend outside the subplots
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95), fontsize = 'small')
     fig.savefig(filePath, dpi=600)
