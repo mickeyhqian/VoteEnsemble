@@ -52,4 +52,4 @@ if __name__ == "__main__":
              B12List, 
              numReplicates, 
              numParallelTrain = 1, 
-             numParallelEval = 12)
+             numParallelEval = 1)
