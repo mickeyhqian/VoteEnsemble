@@ -3,6 +3,11 @@ from sklearn.linear_model import LinearRegression
 import numpy as np
 from numpy.typing import NDArray
 import cvxpy as cp
+import torch
+from torch import nn
+from torch import optim
+from torch.utils.data import TensorDataset, DataLoader
+from typing import List
 
     
 
@@ -95,9 +100,86 @@ class BasePortfolio(BaseTrainer):
         return True
 
     def objective(self, trainingResult: NDArray, sample: NDArray) -> float:
-        try:
-            sampleCentered = sample - self._mu.reshape(1, -1)
-            covMatrix = np.dot(sampleCentered.T, sampleCentered) / len(sample)
-            return np.dot(np.dot(covMatrix, trainingResult), trainingResult)
-        except:
-            return None
+        sampleCentered = sample - self._mu.reshape(1, -1)
+        covMatrix = np.dot(sampleCentered.T, sampleCentered) / len(sample)
+        return np.dot(np.dot(covMatrix, trainingResult), trainingResult)
+
+
+class RegressionNN(nn.Module):
+    def __init__(self, inputSize: int, layerSizes: List[int]):
+        super().__init__()
+        layers = []
+        prevSize = inputSize
+        for size in layerSizes:
+            layers.append(nn.Linear(prevSize, size))
+            layers.append(nn.ReLU())
+            prevSize = size
+
+        layers.append(nn.Linear(prevSize, 1))  # Output layer
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.layers(x)
+
+
+class BaseNN(BaseTrainer):
+    def __init__(self, layerSizes: List[int], batchSize: int = 50, epochs: int = 100, learningRate: float = 1e-3):
+        self._layerSizes: List[int] = layerSizes
+        self._batchSize: int = batchSize
+        self._epochs: int = epochs
+        self._learningRate: float = learningRate
+        self._device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # self._device: torch.device = torch.device("cpu")
+
+    def train(self, sample: NDArray) -> RegressionNN:
+        torch.manual_seed(1109)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+        model = RegressionNN(sample.shape[1] - 1, self._layerSizes).to(self._device)
+        
+        criterion = nn.MSELoss()
+        optimizer = optim.Adam(model.parameters(), lr = self._learningRate)
+
+        tensorX = torch.Tensor(sample[:, 1:]).to(self._device)
+        tensorY = torch.Tensor(sample[:, :1]).to(self._device)
+
+        dataset = TensorDataset(tensorX, tensorY)  # Create dataset
+        dataloader = DataLoader(dataset, batch_size = self._batchSize, shuffle = True)  # Create DataLoader
+
+        model.train()
+        for _ in range(self._epochs):
+            for inputs, targets in dataloader:
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
+        
+        return model
+
+    @property
+    def enableDeduplication(self):
+        return False
+
+    def isDuplicate(self):
+        pass
+
+    @property
+    def isMinimization(self):
+        return True
+
+    def objective(self, trainingResult: RegressionNN, sample: NDArray) -> float:
+        trainingResult.to(self._device)
+        trainingResult.eval()
+
+        tensorX = torch.Tensor(sample[:, 1:]).to(self._device)
+        tensorY = torch.Tensor(sample[:, :1]).to(self._device)
+
+        with torch.no_grad():
+            Ypred = trainingResult(tensorX)
+
+        criterion = nn.MSELoss()
+        loss = criterion(Ypred, tensorY)
+        
+        return loss.item()
