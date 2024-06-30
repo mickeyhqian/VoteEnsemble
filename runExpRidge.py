@@ -1,4 +1,4 @@
-from BaseTrainers import BaseLR
+from BaseTrainers import BaseRidge
 from ExpPipeline import pipeline
 import numpy as np
 from numpy.typing import NDArray
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # rngProb = np.random.default_rng(seed = 999)
 
     # meanX = rngProb.uniform(1.1, 1.9, 10)
-    d = 10
+    d = 5000
     meanX = np.linspace(1, 10, num = d)
     # beta = rngProb.uniform(1, 20, 10)
     beta = np.linspace(-10, 10, num = d)
@@ -34,7 +34,7 @@ if __name__ == "__main__":
         XVars = (2 * meanX)**2 / 12
         return np.dot(meanX, error) ** 2 + np.sum(error**2 * XVars)
 
-    lr = BaseLR()
+    lr = BaseRidge(1.0)
 
     sampleSizeList = [2**i for i in range(10, 17)]
     kList = []
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     B12List = [(50, 200)]
     numReplicates = 200
     
-    pipeline("LR_d10_SAA", 
+    pipeline("LR_d5000_Ridge", 
              str(uuid4()), 
              lr, 
              sampler, 

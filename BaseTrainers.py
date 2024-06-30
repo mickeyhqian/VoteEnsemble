@@ -1,5 +1,5 @@
 from Bagging import BaseTrainer
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge
 import numpy as np
 from numpy.typing import NDArray
 import cvxpy as cp
@@ -64,6 +64,33 @@ class BaseLR(BaseTrainer):
     def objective(self, trainingResult: LinearRegression, sample: NDArray) -> float:
         error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
         return np.mean(error ** 2)
+    
+
+class BaseRidge(BaseTrainer):
+    def __init__(self, alpha: float):
+        self._alpha: float = alpha
+
+    def train(self, sample: NDArray) -> Ridge:
+        y = sample[:,0]
+        X = sample[:,1:]
+        lr = Ridge(alpha = self._alpha, fit_intercept = False, random_state = 666)
+        lr.fit(X, y)
+        return lr
+
+    @property
+    def enableDeduplication(self):
+        return False
+    
+    def isDuplicate(self):
+        pass
+    
+    @property
+    def isMinimization(self):
+        return True
+    
+    def objective(self, trainingResult: Ridge, sample: NDArray) -> float:
+        error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
+        return np.mean(error ** 2) + np.mean(trainingResult.coef_ ** 2) * self._alpha / len(sample)
 
 
 class BasePortfolio(BaseTrainer):

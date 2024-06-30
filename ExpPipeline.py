@@ -196,21 +196,27 @@ def plotAverage(baseObjAvg: List,
                 BList: List, 
                 k12List: List, 
                 B12List: List,
-                filePath: str):
+                filePath: str,
+                xLogScale: bool = True,
+                yLogScale: bool = False):
     fig, ax = plt.subplots()
-    ax.plot(sampleSizeList, baseObjAvg, marker = 'o', markeredgecolor = 'none', color = 'blue', linestyle = 'solid', linewidth = 2, label = 'base')
+    ax.plot(sampleSizeList, baseObjAvg, marker = 'o', markeredgecolor = 'none', color = 'blue', linestyle = 'solid', label = 'base')
 
     for ind1, B in enumerate(BList):
         for ind2, k in enumerate(kList):
-            ax.plot(sampleSizeList, BAGObjAvg[ind1][ind2], marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'BAG, B={B}, k={k}')
+            ax.plot(sampleSizeList, BAGObjAvg[ind1][ind2], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'BAG, B={B}, k={k}')
     
     for ind1, B12 in enumerate(B12List):
         for ind2, k in enumerate(k12List):
-            ax.plot(sampleSizeList, ReBAGObjAvg[ind1][ind2], marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'ReBAG, B12={B12}, k={k}')
-            ax.plot(sampleSizeList, ReBAGSObjAvg[ind1][ind2], marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'ReBAGS, B12={B12}, k={k}')
+            ax.plot(sampleSizeList, ReBAGObjAvg[ind1][ind2], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'ReBAG, B12={B12}, k={k}')
+            ax.plot(sampleSizeList, ReBAGSObjAvg[ind1][ind2], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'ReBAGS, B12={B12}, k={k}')
     
     ax.set_xlabel('sample size', size = 20)
     ax.set_ylabel('cost', size = 20)
+    if xLogScale:
+        ax.set_xscale('log')
+    if yLogScale:
+        ax.set_yscale('log')
     ax.legend(fontsize = 'small')
     fig.savefig(filePath, dpi=600)
 
@@ -224,7 +230,9 @@ def plotCDF(baseObjList: List,
             BList: List, 
             k12List: List, 
             B12List: List,
-            filePath: str):
+            filePath: str,
+            xLogScale: bool = False,
+            yLogScale: bool = True):
     fig, ax = plt.subplots(nrows=len(sampleSizeList), figsize=(6, len(sampleSizeList) * 4))
 
     def getCDF(sequence):
@@ -251,24 +259,27 @@ def plotCDF(baseObjList: List,
 
     for i in range(len(sampleSizeList)):
         xList, yList = getCDF(baseObjList[i])
-        ax[i].plot(xList, yList, marker = 'o', markeredgecolor = 'none', color = 'blue',linestyle = 'solid', linewidth = 2, label = 'base')
+        ax[i].plot(xList, yList, marker = 'o', markeredgecolor = 'none', color = 'blue', linestyle = 'solid', label = 'base')
         for ind1, B in enumerate(BList):
             for ind2, k in enumerate(kList):
                 xList, yList = getCDF(BAGObjList[ind1][ind2][i])
-                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'BAG, B={B}, k={k}')
+                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'BAG, B={B}, k={k}')
         
         for ind1, B12 in enumerate(B12List):
             for ind2, k in enumerate(k12List):
                 xList, yList = getCDF(ReBAGObjList[ind1][ind2][i])
-                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'ReBAG, B12={B12}, k={k}')
+                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'ReBAG, B12={B12}, k={k}')
                 xList, yList = getCDF(ReBAGSObjList[ind1][ind2][i])
-                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', linewidth = 2, label = f'ReBAGS, B12={B12}, k={k}')
+                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'ReBAGS, B12={B12}, k={k}')
         
         if i == len(sampleSizeList) - 1:
             ax[i].set_xlabel('cost')
 
         ax[i].set_ylabel('tail prob')
-        ax[i].set_yscale('log')
+        if xLogScale:
+            ax[i].set_xscale('log')
+        if yLogScale:
+            ax[i].set_yscale('log')
         ax[i].set_title(f'sample size = {sampleSizeList[i]}', fontsize = "medium")
 
     # Create a legend using the first subplot
