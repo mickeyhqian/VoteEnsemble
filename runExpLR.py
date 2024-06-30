@@ -13,10 +13,13 @@ if __name__ == "__main__":
     set_start_method("spawn")
 
     rngData = np.random.default_rng(seed = 888)
-    rngProb = np.random.default_rng(seed = 999)
+    # rngProb = np.random.default_rng(seed = 999)
 
-    meanX = rngProb.uniform(1.1, 1.9, 10)
-    beta = rngProb.uniform(1, 20, 10)
+    # meanX = rngProb.uniform(1.1, 1.9, 10)
+    d = 10
+    meanX = np.linspace(1, 10, num = d)
+    # beta = rngProb.uniform(1, 20, 10)
+    beta = np.linspace(-10, 10, num = d)
     noiseShape = 2.1
 
     def sampler(n: int) -> NDArray:
@@ -33,12 +36,12 @@ if __name__ == "__main__":
 
     lr = BaseLR()
 
-    sampleSizeList = [2**i for i in range(10, 15)]
+    sampleSizeList = [2**i for i in range(10, 17)]
     kList = []
     BList = []
     k12List = [((30, 0.5), (30, 0.005))]
     B12List = [(50, 200)]
-    numReplicates = 10
+    numReplicates = 100
     
     pipeline("LR_SAA", 
              str(uuid4()), 
