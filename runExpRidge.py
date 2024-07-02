@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 from multiprocessing import set_start_method
 from scipy import stats
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
 from uuid import uuid4
 
 
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # rngProb = np.random.default_rng(seed = 999)
 
     # meanX = rngProb.uniform(1.1, 1.9, 10)
-    d = 5000
+    d = 50
     meanX = np.linspace(1, 10, num = d)
     # beta = rngProb.uniform(1, 20, 10)
     beta = np.linspace(-10, 10, num = d)
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         YSample = np.dot(XSample, np.reshape(beta, (-1,1))) + noise.reshape(-1, 1)
         return np.hstack((YSample, XSample))
 
-    def evaluator(trainingResult: LinearRegression) -> float:
+    def evaluator(trainingResult: Ridge) -> float:
         error = trainingResult.coef_ - beta
         XVars = (2 * meanX)**2 / 12
         return np.dot(meanX, error) ** 2 + np.sum(error**2 * XVars)
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     B12List = [(50, 200)]
     numReplicates = 200
     
-    pipeline("LR_d5000_Ridge", 
+    pipeline(f"LR_d{d}_Ridge", 
              str(uuid4()), 
              lr, 
              sampler, 

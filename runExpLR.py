@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # rngProb = np.random.default_rng(seed = 999)
 
     # meanX = rngProb.uniform(1.1, 1.9, 10)
-    d = 10
+    d = 50
     meanX = np.linspace(1, 10, num = d)
     # beta = rngProb.uniform(1, 20, 10)
     beta = np.linspace(-10, 10, num = d)
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     B12List = [(50, 200)]
     numReplicates = 200
     
-    pipeline("LR_d10_SAA", 
+    pipeline(f"LR_d{d}_SAA", 
              str(uuid4()), 
              lr, 
              sampler, 
