@@ -12,14 +12,16 @@ if __name__ == "__main__":
     set_start_method("spawn")
 
     rngData = np.random.default_rng(seed = 888)
-    rngProb = np.random.default_rng(seed = 999)
+    # rngProb = np.random.default_rng(seed = 999)
     rngEval = np.random.default_rng(seed = 777)
 
-    meanX = rngProb.uniform(1.1, 1.9, 10)
+    d = 10
+    # meanX = rngProb.uniform(1.1, 1.9, d)
+    meanX = np.linspace(1, 100, num = d)
     noiseShape = 2.1
 
     def trueMapping(x: NDArray) -> float:
-        return np.mean(x**2)
+        return np.mean(np.log(x + 1))
 
     def sampler(n: int) -> NDArray:
         XSample = rngData.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
@@ -33,7 +35,7 @@ if __name__ == "__main__":
         YSample = np.asarray([[trueMapping(x)] for x in XSample])
         return np.hstack((YSample, XSample))
     
-    baseNN = BaseNN([100, 500, 1000, 500, 100], batchSize = 1000, epochs = 5, learningRate = 1e-3)
+    baseNN = BaseNN([50, 50], useGPU = False)
 
     evalSample = evalSampler(1000000)
 
@@ -41,14 +43,14 @@ if __name__ == "__main__":
         return baseNN.objective(trainingResult, evalSample)
 
 
-    sampleSizeList = [2**i for i in range(18, 20)]
+    sampleSizeList = [2**i for i in range(14, 20)]
     kList = []
     BList = []
     k12List = [((30, 0.5), (30, 0.005))]
     B12List = [(50, 200)]
-    numReplicates = 10
+    numReplicates = 100
     
-    pipeline("NN_SAA", 
+    pipeline(f"NN_d{d}_SAA", 
              str(uuid4()), 
              baseNN, 
              sampler, 

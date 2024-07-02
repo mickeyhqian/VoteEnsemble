@@ -150,13 +150,12 @@ class RegressionNN(nn.Module):
 
 
 class BaseNN(BaseTrainer):
-    def __init__(self, layerSizes: List[int], batchSize: int = 50, epochs: int = 100, learningRate: float = 1e-3):
+    def __init__(self, layerSizes: List[int], batchSize: int = 64, epochs: int = 30, learningRate: float = 1e-3, useGPU: bool = True):
         self._layerSizes: List[int] = layerSizes
         self._batchSize: int = batchSize
         self._epochs: int = epochs
         self._learningRate: float = learningRate
-        self._device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        # self._device: torch.device = torch.device("cpu")
+        self._device: torch.device = torch.device("cuda" if useGPU and torch.cuda.is_available() else "cpu")
 
     def train(self, sample: NDArray) -> RegressionNN:
         torch.manual_seed(1109)
