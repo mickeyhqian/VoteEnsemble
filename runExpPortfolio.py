@@ -5,11 +5,27 @@ from numpy.typing import NDArray
 from multiprocessing import set_start_method
 from scipy import stats
 from uuid import uuid4
+import sys
+import os
+import logging
+logger = logging.getLogger(name = "Bagging")
 
 
 
 if __name__ == "__main__":
     set_start_method("spawn")
+
+    if len(sys.argv) > 1:
+        resultDir = sys.argv[1]
+    else:
+        resultDir = os.path.join(os.path.dirname(__file__), str(uuid4()))
+
+    os.makedirs(resultDir, exist_ok = True)
+    logger.setLevel(logging.DEBUG)
+    logHandler = logging.FileHandler(os.path.join(resultDir, "exp.log"))
+    formatter = logging.Formatter(fmt = "%(asctime)s - %(levelname)s - %(message)s")
+    logHandler.setFormatter(formatter)
+    logger.addHandler(logHandler)
 
     rngData = np.random.default_rng(seed = 888)
     # rngProb = np.random.default_rng(seed = 999)
@@ -56,8 +72,7 @@ if __name__ == "__main__":
     B12List = [(50, 200)]
     numReplicates = 200
     
-    pipeline(f"port_d{d}_SAA", 
-             str(uuid4()), 
+    pipeline(resultDir,
              portfolio, 
              sampler, 
              evaluator, 
