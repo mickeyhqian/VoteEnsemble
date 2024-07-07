@@ -150,12 +150,14 @@ class RegressionNN(nn.Module):
 
 
 class BaseNN(BaseTrainer):
-    def __init__(self, layerSizes: List[int], batchSize: int = 64, epochs: int = 30, learningRate: float = 1e-3, useGPU: bool = True):
+    def __init__(self, layerSizes: List[int], batchSize: int = 64, minEpochs: int = 5, maxEpochs: int = 30, learningRate: float = 1e-3, useGPU: bool = True):
         self._layerSizes: List[int] = layerSizes
         self._batchSize: int = batchSize
-        self._epochs: int = epochs
+        self._minEpochs: int = max(1, minEpochs)
+        self._maxEpochs: int = max(1, maxEpochs)
         self._learningRate: float = learningRate
         self._device: torch.device = torch.device("cuda" if useGPU and torch.cuda.is_available() else "cpu")
+        self._cpu: torch.device = torch.device("cpu")
 
     def train(self, sample: NDArray) -> RegressionNN:
         torch.manual_seed(1109)
@@ -169,19 +171,24 @@ class BaseNN(BaseTrainer):
 
         tensorX = torch.Tensor(sample[:, 1:]).to(self._device)
         tensorY = torch.Tensor(sample[:, :1]).to(self._device)
-
         dataset = TensorDataset(tensorX, tensorY)  # Create dataset
         dataloader = DataLoader(dataset, batch_size = self._batchSize, shuffle = True)  # Create DataLoader
 
+        minSize = 16384
+        maxSize = 131072
+        numEpochs = np.log(len(sample) / minSize) * (self._minEpochs - self._maxEpochs) / np.log(maxSize / minSize) + self._maxEpochs
+        numEpochs = max(min(int(numEpochs), self._maxEpochs), self._minEpochs)
+
         model.train()
-        for _ in range(self._epochs):
+        for _ in range(numEpochs):
             for inputs, targets in dataloader:
                 optimizer.zero_grad()
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
                 loss.backward()
                 optimizer.step()
-        
+
+        model.to(self._cpu)
         return model
 
     @property
@@ -207,5 +214,5 @@ class BaseNN(BaseTrainer):
 
         criterion = nn.MSELoss()
         loss = criterion(Ypred, tensorY)
-        
+        trainingResult.to(self._cpu)
         return loss.item()

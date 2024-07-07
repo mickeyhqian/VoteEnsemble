@@ -1,11 +1,12 @@
 from Bagging import BaseTrainer, BAG, ReBAG
 import numpy as np
 from numpy.typing import NDArray
-import time
 import pickle
 import matplotlib.pyplot as plt
 import os
 from typing import List, Tuple, Callable, Any
+import logging
+logger = logging.getLogger(name = "Bagging")
 
 
 
@@ -29,21 +30,19 @@ def runTraining(baseTrainer: BaseTrainer,
         for j in range(numReplicates):
             sample = sampler(n)
             
-            tic = time.time()
             baseResult = baseTrainer.train(sample)
             if baseResult is None:
                 raise RuntimeError(f"base training failed for sample size {n}, replication {j}")
             baseList[i].append(baseTrainer.toPickleable(baseResult))
-            print(f"Finish base training for sample size {n}, replication {j}, taking {time.time()-tic} secs")
+            logger.info(f"Finish base training for sample size {n}, replication {j}")
 
             for ind1, B in enumerate(BList):
                 for ind2, (base, ratio) in enumerate(kList):
                     k = max(base, int(n * ratio))
                     bag = BAG(baseTrainer, numParallelTrain = numParallelTrain, randomState = 666)
 
-                    tic = time.time()
                     BAGList[ind1][ind2][i].append(baseTrainer.toPickleable(bag.run(sample, k, B)))
-                    print(f"Finish BAG training for sample size {n}, replication {j}, B={B}, k={k}, taking {time.time()-tic} secs")
+                    logger.info(f"Finish BAG training for sample size {n}, replication {j}, B={B}, k={k}")
 
             for ind1, (B1, B2) in enumerate(B12List):
                 for ind2, ((base1, ratio1), (base2, ratio2)) in enumerate(k12List):
@@ -51,9 +50,8 @@ def runTraining(baseTrainer: BaseTrainer,
                     k2 = max(base2, int(n * ratio2))
                     rebag = ReBAG(baseTrainer, False, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666)
                     
-                    tic = time.time()
                     ReBAGList[ind1][ind2][i].append(baseTrainer.toPickleable(rebag.run(sample, k1, k2, B1, B2)))
-                    print(f"Finish ReBAG training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}, taking {time.time()-tic} secs")
+                    logger.info(f"Finish ReBAG training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}")
 
             for ind1, (B1, B2) in enumerate(B12List):
                 for ind2, ((base1, ratio1), (base2, ratio2)) in enumerate(k12List):
@@ -61,9 +59,8 @@ def runTraining(baseTrainer: BaseTrainer,
                     k2 = max(base2, int(n / 2 * ratio2))
                     rebags = ReBAG(baseTrainer, True, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666)
 
-                    tic = time.time()
                     ReBAGSList[ind1][ind2][i].append(baseTrainer.toPickleable(rebags.run(sample, k1, k2, B1, B2)))
-                    print(f"Finish ReBAGS training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}, taking {time.time()-tic} secs")
+                    logger.info(f"Finish ReBAGS training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}")
 
     return baseList, BAGList, ReBAGList, ReBAGSList
 
@@ -145,6 +142,7 @@ def dumpTrainingResults(baseList: List,
             B12List, 
             numReplicates,
         ), f)
+    logger.info(f"dumped training results to {filePath}")
 
 
 def dumpEvalResults(baseObjList: List, 
@@ -180,6 +178,7 @@ def dumpEvalResults(baseObjList: List,
             B12List, 
             numReplicates,
         ), f)
+    logger.info(f"dumped evaluation results to {filePath}")
 
 
 def loadResults(filePath: str):
@@ -218,7 +217,10 @@ def plotAverage(baseObjAvg: List,
     if yLogScale:
         ax.set_yscale('log')
     ax.legend(fontsize = 'small')
-    fig.savefig(filePath, dpi=600)
+
+    os.makedirs(os.path.dirname(filePath), exist_ok = True)
+    fig.savefig(filePath, dpi = 600)
+    logger.info(f"saved a plot of average performance to {filePath}")
 
 
 def plotCDF(baseObjList: List, 
@@ -233,7 +235,9 @@ def plotCDF(baseObjList: List,
             filePath: str,
             xLogScale: bool = False,
             yLogScale: bool = True):
-    fig, ax = plt.subplots(nrows=len(sampleSizeList), figsize=(6, len(sampleSizeList) * 4))
+    fig, ax = plt.subplots(nrows = len(sampleSizeList), figsize = (6, len(sampleSizeList) * 4))
+    if len(sampleSizeList) <= 1:
+        ax = [ax]
 
     def getCDF(sequence):
         xList = []
@@ -286,12 +290,14 @@ def plotCDF(baseObjList: List,
     handles, labels = ax[0].get_legend_handles_labels()
 
     # Place the combined legend outside the subplots
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95), fontsize = 'small')
-    fig.savefig(filePath, dpi=600)
+    fig.legend(handles, labels, loc = 'upper center', bbox_to_anchor = (0.5, 0.95), fontsize = 'small')
+
+    os.makedirs(os.path.dirname(filePath), exist_ok = True)
+    fig.savefig(filePath, dpi = 600)
+    logger.info(f"saved plots of performance CDFs to {filePath}")
 
 
-def pipeline(caseName: str,
-             expID: str,
+def pipeline(resultDir: str,
              baseTrainer: BaseTrainer, 
              sampler: Callable,
              evaluator: Callable,
@@ -313,8 +319,8 @@ def pipeline(caseName: str,
                                                            numReplicates,
                                                            numParallelTrain = numParallelTrain,
                                                            numParallelEval = numParallelEval)
-    scriptDir = os.path.dirname(__file__)
-    trainingResultFile = f"{scriptDir}/ExpData/{caseName}/{expID}/trainingResults.pkl"
+
+    trainingResultFile = os.path.join(resultDir, "trainingResults.pkl")
     dumpTrainingResults(baseList, 
                         BAGList, 
                         ReBAGList, 
@@ -341,7 +347,7 @@ def pipeline(caseName: str,
                                                                                                                            B12List,
                                                                                                                            numReplicates)
     
-    evalResultFile = f"{scriptDir}/ExpData/{caseName}/{expID}/evalResults.pkl"
+    evalResultFile = os.path.join(resultDir, "evalResults.pkl")
     dumpEvalResults(baseObjList, 
                     BAGObjList, 
                     ReBAGObjList, 
@@ -359,8 +365,8 @@ def pipeline(caseName: str,
                     evalResultFile)
     
 
-    avgFigPath = f"{scriptDir}/ExpData/{caseName}/{expID}/avgPlot.png"
-    cdfFigPath = f"{scriptDir}/ExpData/{caseName}/{expID}/cdfPlot.png"
+    avgFigPath = os.path.join(resultDir, "avgPlot.png")
+    cdfFigPath = os.path.join(resultDir, "cdfPlot.png")
     plotAverage(baseObjAvg, 
                 BAGObjAvg, 
                 ReBAGObjAvg, 
