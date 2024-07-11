@@ -43,6 +43,7 @@ if __name__ == "__main__":
         XSample = rngData.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
         noise: NDArray = stats.lomax.rvs(noiseShape, size = n, random_state = rngData) \
             - stats.lomax.rvs(noiseShape, size = n, random_state = rngData)
+        # noise: NDArray = rngData.normal(size = n)
         YSample = np.asarray([[trueMapping(x)] for x in XSample]) + noise.reshape(-1, 1)
         return np.hstack((YSample, XSample))
     
@@ -51,9 +52,10 @@ if __name__ == "__main__":
         YSample = np.asarray([[trueMapping(x)] for x in XSample])
         return np.hstack((YSample, XSample))
     
+    # baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.005, useGPU = True)
     # baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.005, useGPU = True)
-    baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.005, useGPU = True)
-    # baseNN = BaseNN([50, 50], learningRate = 0.005, useGPU = False)
+    # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.005, useGPU = True)
+    baseNN = BaseNN([50, 50], learningRate = 0.005, useGPU = True)
 
     evalSample = evalSampler(1000000)
 

@@ -64,7 +64,8 @@ class BaseTrainer(metaclass = ABCMeta):
     @abstractmethod
     def objective(self, trainingResult: Any, sample: NDArray) -> float:
         """
-        Evaluates the training objective for a training result on a data set (should be the same as the training objective optimized by self.train).
+        Evaluates the training objective for a training result on a data set.
+        This evaluation is to be used in the voting phase of ReBAG, and may or may not be the same as the training objective optimized by self.train.
 
         Invoked in ReBAG only.
 
@@ -240,7 +241,7 @@ class ReBAG(BaseBagging):
 
             baseTrainer: A base trainer of type BaseTrainer.
 
-            dataSplit: Whether or not (ReBAGS vs ReBAG) to split the data across the model candidate retrieval phase and the majority-vote phase.
+            dataSplit: Whether or not (ReBAG-S vs ReBAG) to split the data across the model candidate retrieval phase and the majority-vote phase.
 
             numParallelEval: Number of processes used for parallel evaluation of training objectives. A value <= 1 disables parallel evaluation. Default 1.
 
@@ -341,7 +342,7 @@ class ReBAG(BaseBagging):
 
     def run(self, sample: NDArray, k1: int, k2: int, B1: int, B2: int, epsilon: float = -1.0, autoEpsilonProb: float = 0.5) -> Any:
         """
-        Run ReBAG (self._dataSplit = False) or ReBAGS (self._dataSplit = True) on the base trainer.
+        Run ReBAG (self._dataSplit = False) or ReBAG-S (self._dataSplit = True) on the base trainer.
 
         Args:
 

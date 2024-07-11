@@ -107,7 +107,6 @@ class BasePortfolio(BaseTrainer):
         objective = cp.Minimize(cp.quad_form(x, covMatrix))
         constraints = [self._mu @ x >= self._b, cp.sum(x) == 1, x >= 0]
 
-        # Formulate the problem
         problem = cp.Problem(objective, constraints)
 
         problem.solve(solver="SCS")
