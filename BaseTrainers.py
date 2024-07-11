@@ -34,12 +34,12 @@ class BaseLP(BaseTrainer):
     def isDuplicate(self, result1: NDArray, result2: NDArray) -> bool:
         return np.max(np.abs(result1 - result2)) < 1e-6
 
+    def objective(self, trainingResult: NDArray, sample: NDArray) -> float:
+        return np.dot(np.mean(sample, axis = 0), trainingResult)
+
     @property
     def isMinimization(self):
         return True
-
-    def objective(self, trainingResult: NDArray, sample: NDArray) -> float:
-        return np.dot(np.mean(sample, axis = 0), trainingResult)
 
 
 class BaseLR(BaseTrainer):
@@ -57,13 +57,13 @@ class BaseLR(BaseTrainer):
     def isDuplicate(self):
         pass
     
-    @property
-    def isMinimization(self):
-        return True
-    
     def objective(self, trainingResult: LinearRegression, sample: NDArray) -> float:
         error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
         return np.mean(error ** 2)
+
+    @property
+    def isMinimization(self):
+        return True
     
 
 class BaseRidge(BaseTrainer):
@@ -84,13 +84,13 @@ class BaseRidge(BaseTrainer):
     def isDuplicate(self):
         pass
     
-    @property
-    def isMinimization(self):
-        return True
-    
     def objective(self, trainingResult: Ridge, sample: NDArray) -> float:
         error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
         return np.mean(error ** 2) + np.mean(trainingResult.coef_ ** 2) * self._alpha / len(sample)
+    
+    @property
+    def isMinimization(self):
+        return True
 
 
 class BasePortfolio(BaseTrainer):
@@ -121,15 +121,15 @@ class BasePortfolio(BaseTrainer):
     def isDuplicate(self):
         pass
 
-    @property
-    def isMinimization(self):
-        return True
-
     def objective(self, trainingResult: NDArray, sample: NDArray) -> float:
         sampleCentered = sample - self._mu.reshape(1, -1)
         covMatrix = np.dot(sampleCentered.T, sampleCentered) / len(sample)
         return np.dot(np.dot(covMatrix, trainingResult), trainingResult)
 
+    @property
+    def isMinimization(self):
+        return True
+    
 
 class RegressionNN(nn.Module):
     def __init__(self, inputSize: int, layerSizes: List[int]):
@@ -197,10 +197,6 @@ class BaseNN(BaseTrainer):
     def isDuplicate(self):
         pass
 
-    @property
-    def isMinimization(self):
-        return True
-
     def objective(self, trainingResult: RegressionNN, sample: NDArray) -> float:
         trainingResult.to(self._device)
         trainingResult.eval()
@@ -215,3 +211,7 @@ class BaseNN(BaseTrainer):
         loss = criterion(Ypred, tensorY)
         trainingResult.to(self._cpu)
         return loss.item()
+
+    @property
+    def isMinimization(self):
+        return True

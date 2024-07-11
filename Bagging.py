@@ -51,16 +51,6 @@ class BaseTrainer(metaclass = ABCMeta):
         """
         pass
 
-    @property
-    @abstractmethod
-    def isMinimization(self):
-        """
-        Property of whether or not the training problem is a minimization.
-
-        Invoked in ReBAG only.
-        """
-        pass
-
     @abstractmethod
     def objective(self, trainingResult: Any, sample: NDArray) -> float:
         """
@@ -78,6 +68,16 @@ class BaseTrainer(metaclass = ABCMeta):
         Returns:
 
             The training objective value.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def isMinimization(self):
+        """
+        Property of whether or not the training objective self.objective is to be minimized (as opposed to maximized).
+
+        Invoked in ReBAG only.
         """
         pass
 
