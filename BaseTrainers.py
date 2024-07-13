@@ -188,6 +188,7 @@ class BaseNN(BaseTrainer):
                 optimizer.step()
 
         model.to(self._cpu)
+        torch.cuda.empty_cache()
         return model
 
     @property

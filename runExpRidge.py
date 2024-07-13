@@ -28,20 +28,15 @@ if __name__ == "__main__":
     logHandler.setFormatter(formatter)
     logger.addHandler(logHandler)
 
-    rngData = np.random.default_rng(seed = 888)
-    # rngProb = np.random.default_rng(seed = 999)
-
-    # meanX = rngProb.uniform(1.1, 1.9, 10)
     d = 50
     meanX = np.linspace(1, 10, num = d)
-    # beta = rngProb.uniform(1, 20, 10)
     beta = np.linspace(-10, 10, num = d)
     noiseShape = 2.1
 
-    def sampler(n: int) -> NDArray:
-        XSample = rngData.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
-        noise: NDArray = stats.lomax.rvs(noiseShape, size = n, random_state = rngData) \
-            - stats.lomax.rvs(noiseShape, size = n, random_state = rngData)
+    def sampler(n: int, rng: np.random.Generator) -> NDArray:
+        XSample = rng.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
+        noise: NDArray = stats.lomax.rvs(noiseShape, size = n, random_state = rng) \
+            - stats.lomax.rvs(noiseShape, size = n, random_state = rng)
         YSample = np.dot(XSample, np.reshape(beta, (-1,1))) + noise.reshape(-1, 1)
         return np.hstack((YSample, XSample))
 

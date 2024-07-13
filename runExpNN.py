@@ -27,11 +27,9 @@ if __name__ == "__main__":
     logHandler.setFormatter(formatter)
     logger.addHandler(logHandler)
 
-    rngData = np.random.default_rng(seed = 888)
-    # rngProb = np.random.default_rng(seed = 999)
     rngEval = np.random.default_rng(seed = 777)
 
-    d = 30
+    d = 50
     # meanX = rngProb.uniform(1.1, 1.9, d)
     meanX = np.linspace(1, 100, num = d)
     noiseShape = 2.1
@@ -39,11 +37,11 @@ if __name__ == "__main__":
     def trueMapping(x: NDArray) -> float:
         return np.mean(np.log(x + 1))
 
-    def sampler(n: int) -> NDArray:
-        XSample = rngData.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
-        noise: NDArray = stats.lomax.rvs(noiseShape, size = n, random_state = rngData) \
-            - stats.lomax.rvs(noiseShape, size = n, random_state = rngData)
-        # noise: NDArray = rngData.normal(size = n)
+    def sampler(n: int, rng: np.random.Generator) -> NDArray:
+        XSample = rng.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
+        noise: NDArray = stats.lomax.rvs(noiseShape, size = n, random_state = rng) \
+            - stats.lomax.rvs(noiseShape, size = n, random_state = rng)
+        # noise: NDArray = rng.normal(size = n)
         YSample = np.asarray([[trueMapping(x)] for x in XSample]) + noise.reshape(-1, 1)
         return np.hstack((YSample, XSample))
     
@@ -55,7 +53,7 @@ if __name__ == "__main__":
     # baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.005, useGPU = True)
     # baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.005, useGPU = True)
     # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.005, useGPU = True)
-    baseNN = BaseNN([50, 50], learningRate = 0.005, useGPU = True)
+    baseNN = BaseNN([50, 50], learningRate = 0.005, useGPU = False)
 
     evalSample = evalSampler(1000000)
 

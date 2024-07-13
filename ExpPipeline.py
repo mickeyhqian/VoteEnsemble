@@ -1,3 +1,4 @@
+import signal
 from Bagging import BaseTrainer, BAG, ReBAG
 import numpy as np
 from numpy.typing import NDArray
@@ -10,8 +11,25 @@ logger = logging.getLogger(name = "Bagging")
 
 
 
+class GracefulKiller:
+    _killed: bool = False
+
+    @classmethod
+    def kill(cls, *args):
+        cls._killed = True
+
+    @classmethod
+    def isKilled(cls) -> bool:
+        return cls._killed
+
+    @classmethod
+    def setup(cls):
+        signal.signal(signal.SIGINT, cls.kill)
+        signal.signal(signal.SIGTERM, cls.kill)
+
+
 def runTraining(baseTrainer: BaseTrainer, 
-                sampler: Callable[[int], NDArray],
+                sampler: Callable[[int, np.random.Generator], NDArray],
                 sampleSizeList: List[int], 
                 kList: List[Tuple[int, float]], 
                 BList: List[int], 
@@ -27,8 +45,9 @@ def runTraining(baseTrainer: BaseTrainer,
 
     for i in range(len(sampleSizeList)):
         n = sampleSizeList[i]
+        sampleRNG = np.random.default_rng(seed = 888)
         for j in range(numReplicates):
-            sample = sampler(n)
+            sample = sampler(n, sampleRNG)
             
             baseResult = baseTrainer.train(sample)
             if baseResult is None:
@@ -130,7 +149,6 @@ def dumpTrainingResults(baseList: List,
     with open(filePath, "wb") as f:
         pickle.dump((
             baseList,
-            baseList, 
             BAGList, 
             ReBAGList, 
             ReBAGSList,
@@ -298,8 +316,8 @@ def plotCDF(baseObjList: List,
 
 def pipeline(resultDir: str,
              baseTrainer: BaseTrainer, 
-             sampler: Callable,
-             evaluator: Callable,
+             sampler: Callable[[int, np.random.Generator], NDArray],
+             evaluator: Callable[[Any], float],
              sampleSizeList: List, 
              kList: List, 
              BList: List, 
@@ -330,35 +348,69 @@ def pipeline(resultDir: str,
     avgFigPath = os.path.join(resultDir, "avgPlot.png")
     cdfFigPath = os.path.join(resultDir, "cdfPlot.png")
 
-    for sampleSize in sampleSizeList:
-        baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = runTraining(baseTrainer, 
-                                                                           sampler,
-                                                                           [sampleSize], 
-                                                                           kList, 
-                                                                           BList, 
-                                                                           k12List, 
-                                                                           B12List, 
-                                                                           numReplicates,
-                                                                           numParallelTrain = numParallelTrain,
-                                                                           numParallelEval = numParallelEval)
+    if os.path.isfile(trainingResultFile):
+        trainingResults = loadResults(trainingResultFile)
+        if len(trainingResults) == 11:
+            trainingResults = trainingResults[1:]
+        (
+            baseList, 
+            BAGList, 
+            ReBAGList, 
+            ReBAGSList,
+            sampleSizeFinished, 
+            _, 
+            _, 
+            _, 
+            _, 
+            _,
+        ) = trainingResults
+        logger.info("Loaded existing training results")
 
-        baseList.extend(baseListNew)
-        BAGList.extend(BAGListNew)
-        ReBAGList.extend(ReBAGListNew)
-        ReBAGSList.extend(ReBAGSListNew)
-        sampleSizeFinished.append(sampleSize)
+    for i in range(len(sampleSizeFinished)):
+        if i >= len(sampleSizeList) or sampleSizeFinished[i] != sampleSizeList[i]:
+            raise ValueError("incorrect existing training results")
 
-        dumpTrainingResults(baseList, 
-                            BAGList, 
-                            ReBAGList, 
-                            ReBAGSList,
-                            sampleSizeFinished, 
-                            kList, 
-                            BList, 
-                            k12List, 
-                            B12List, 
-                            numReplicates,
-                            trainingResultFile)
+    GracefulKiller.setup()
+    i = 0
+    while i < len(sampleSizeList):
+        if GracefulKiller.isKilled():
+            logger.info("The experiment is killed")
+            break
+        
+        if i < len(sampleSizeFinished):
+            baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = baseList[:len(sampleSizeFinished)], BAGList[:len(sampleSizeFinished)], ReBAGList[:len(sampleSizeFinished)], ReBAGSList[:len(sampleSizeFinished)]
+            evalSampleSizeList = sampleSizeFinished
+            i = len(sampleSizeFinished)
+        else: 
+            baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = runTraining(baseTrainer, 
+                                                                               sampler,
+                                                                               [sampleSizeList[i]], 
+                                                                               kList, 
+                                                                               BList, 
+                                                                               k12List, 
+                                                                               B12List, 
+                                                                               numReplicates,
+                                                                               numParallelTrain = numParallelTrain,
+                                                                               numParallelEval = numParallelEval)
+            evalSampleSizeList = [sampleSizeList[i]]
+            baseList.extend(baseListNew)
+            BAGList.extend(BAGListNew)
+            ReBAGList.extend(ReBAGListNew)
+            ReBAGSList.extend(ReBAGSListNew)
+            sampleSizeFinished.extend(evalSampleSizeList)
+            i += 1
+
+            dumpTrainingResults(baseList, 
+                                BAGList, 
+                                ReBAGList, 
+                                ReBAGSList,
+                                sampleSizeFinished, 
+                                kList, 
+                                BList, 
+                                k12List, 
+                                B12List, 
+                                numReplicates,
+                                trainingResultFile)
         
 
         baseObjListNew, BAGObjListNew, ReBAGObjListNew, ReBAGSObjListNew, baseObjAvgNew, BAGObjAvgNew, ReBAGObjAvgNew, ReBAGSObjAvgNew = runEvaluation(baseTrainer,
@@ -367,7 +419,7 @@ def pipeline(resultDir: str,
                                                                                                                                                        ReBAGListNew, 
                                                                                                                                                        ReBAGSListNew, 
                                                                                                                                                        evaluator,
-                                                                                                                                                       [sampleSize], 
+                                                                                                                                                       evalSampleSizeList, 
                                                                                                                                                        kList, 
                                                                                                                                                        BList, 
                                                                                                                                                        k12List, 

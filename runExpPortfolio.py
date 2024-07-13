@@ -27,9 +27,6 @@ if __name__ == "__main__":
     logHandler.setFormatter(formatter)
     logger.addHandler(logHandler)
 
-    rngData = np.random.default_rng(seed = 888)
-    # rngProb = np.random.default_rng(seed = 999)
-
     d = 10
     hiddenD = 100
     hiddenShapes = np.full(hiddenD, 2.01)
@@ -51,8 +48,8 @@ if __name__ == "__main__":
     # def sampler(n: int) -> NDArray:
     #     return stats.lomax.rvs(meanX / (meanX - 1), size = (n, len(meanX)), random_state = rngData) + 1
 
-    def sampler(n: int) -> NDArray:
-        hidden = stats.lomax.rvs(hiddenShapes, size = (n, hiddenD), random_state = rngData) * hiddenMultipliers.reshape(1, -1)
+    def sampler(n: int, rng: np.random.Generator) -> NDArray:
+        hidden = stats.lomax.rvs(hiddenShapes, size = (n, hiddenD), random_state = rng) * hiddenMultipliers.reshape(1, -1)
         return np.dot(hidden, genMatrix)
 
     # def evaluator(trainingResult: NDArray) -> float:
