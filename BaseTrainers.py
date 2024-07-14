@@ -188,7 +188,6 @@ class BaseNN(BaseTrainer):
                 optimizer.step()
 
         model.to(self._cpu)
-        torch.cuda.empty_cache()
         return model
 
     @property
@@ -202,14 +201,21 @@ class BaseNN(BaseTrainer):
         trainingResult.to(self._device)
         trainingResult.eval()
 
-        tensorX = torch.Tensor(sample[:, 1:]).to(self._device)
+        tensorX = torch.Tensor(sample[:, 1:])
         tensorY = torch.Tensor(sample[:, :1]).to(self._device)
+        dataset = TensorDataset(tensorX)  # Create dataset
+        dataloader = DataLoader(dataset, batch_size = 131072, shuffle = False)  # Create DataLoader
 
+        YpredList = []
         with torch.no_grad():
-            Ypred = trainingResult(tensorX)
+            for data in dataloader:
+                data = data[0].to(self._device)
+                YpredList.append(trainingResult(data))
 
+        Ypred = torch.cat(YpredList)
         criterion = nn.MSELoss()
         loss = criterion(Ypred, tensorY)
+
         trainingResult.to(self._cpu)
         return loss.item()
 

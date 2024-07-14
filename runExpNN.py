@@ -52,8 +52,8 @@ if __name__ == "__main__":
     
     # baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.005, useGPU = True)
     # baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.005, useGPU = True)
-    # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.005, useGPU = True)
-    baseNN = BaseNN([50, 50], learningRate = 0.005, useGPU = False)
+    baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.005, useGPU = True)
+    # baseNN = BaseNN([50, 50], learningRate = 0.005, useGPU = False)
 
     evalSample = evalSampler(1000000)
 

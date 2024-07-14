@@ -28,6 +28,14 @@ class GracefulKiller:
         signal.signal(signal.SIGTERM, cls.kill)
 
 
+class KilledByUser(Exception):
+    pass
+
+def checkKiller():
+    if GracefulKiller.isKilled():
+        raise KilledByUser()
+
+
 def runTraining(baseTrainer: BaseTrainer, 
                 sampler: Callable[[int, np.random.Generator], NDArray],
                 sampleSizeList: List[int], 
@@ -49,6 +57,7 @@ def runTraining(baseTrainer: BaseTrainer,
         for j in range(numReplicates):
             sample = sampler(n, sampleRNG)
             
+            checkKiller()
             baseResult = baseTrainer.train(sample)
             if baseResult is None:
                 raise RuntimeError(f"base training failed for sample size {n}, replication {j}")
@@ -60,6 +69,7 @@ def runTraining(baseTrainer: BaseTrainer,
                     k = max(base, int(n * ratio))
                     bag = BAG(baseTrainer, numParallelTrain = numParallelTrain, randomState = 666)
 
+                    checkKiller()
                     BAGList[i][ind1][ind2].append(baseTrainer.toPickleable(bag.run(sample, k, B)))
                     logger.info(f"Finish BAG training for sample size {n}, replication {j}, B={B}, k={k}")
 
@@ -69,6 +79,7 @@ def runTraining(baseTrainer: BaseTrainer,
                     k2 = max(base2, int(n * ratio2))
                     rebag = ReBAG(baseTrainer, False, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666)
                     
+                    checkKiller()
                     ReBAGList[i][ind1][ind2].append(baseTrainer.toPickleable(rebag.run(sample, k1, k2, B1, B2)))
                     logger.info(f"Finish ReBAG training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}")
 
@@ -78,6 +89,7 @@ def runTraining(baseTrainer: BaseTrainer,
                     k2 = max(base2, int(n / 2 * ratio2))
                     rebags = ReBAG(baseTrainer, True, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666)
 
+                    checkKiller()
                     ReBAGSList[i][ind1][ind2].append(baseTrainer.toPickleable(rebags.run(sample, k1, k2, B1, B2)))
                     logger.info(f"Finish ReBAG-S training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}")
 
@@ -111,16 +123,24 @@ def runEvaluation(baseTrainer: BaseTrainer,
 
     for i in range(len(sampleSizeList)):
         for j in range(numReplicates):
+            checkKiller()
             baseObjList[i].append(evaluator(baseTrainer.fromPickleable(baseList[i][j])))
+            logger.info(f"Finish base evaluation for sample size {sampleSizeList[i]}, replication {j}")
 
             for ind1 in range(len(BList)):
                 for ind2 in range(len(kList)):
+                    checkKiller()
                     BAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.fromPickleable(BAGList[i][ind1][ind2][j])))
+                    logger.info(f"Finish BAG evaluation for sample size {sampleSizeList[i]}, replication {j}, B={BList[ind1]}, k={kList[ind2]}")
 
             for ind1 in range(len(B12List)):
                 for ind2 in range(len(k12List)):
+                    checkKiller()
                     ReBAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.fromPickleable(ReBAGList[i][ind1][ind2][j])))
+                    logger.info(f"Finish ReBAG evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12 = {k12List[ind2]}")
+                    checkKiller()
                     ReBAGSObjList[i][ind1][ind2].append(evaluator(baseTrainer.fromPickleable(ReBAGSList[i][ind1][ind2][j])))
+                    logger.info(f"Finish ReBAG-S evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12 = {k12List[ind2]}")
     
         baseObjAvg[i] = np.mean(baseObjList[i])
         for ind1 in range(len(BList)):
@@ -371,75 +391,87 @@ def pipeline(resultDir: str,
             raise ValueError("incorrect existing training results")
 
     GracefulKiller.setup()
-    i = 0
-    while i < len(sampleSizeList):
-        if GracefulKiller.isKilled():
-            logger.info("The experiment is killed")
-            break
-        
-        if i < len(sampleSizeFinished):
-            baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = baseList[:len(sampleSizeFinished)], BAGList[:len(sampleSizeFinished)], ReBAGList[:len(sampleSizeFinished)], ReBAGSList[:len(sampleSizeFinished)]
-            evalSampleSizeList = sampleSizeFinished
-            i = len(sampleSizeFinished)
-        else: 
-            baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = runTraining(baseTrainer, 
-                                                                               sampler,
-                                                                               [sampleSizeList[i]], 
-                                                                               kList, 
-                                                                               BList, 
-                                                                               k12List, 
-                                                                               B12List, 
-                                                                               numReplicates,
-                                                                               numParallelTrain = numParallelTrain,
-                                                                               numParallelEval = numParallelEval)
-            evalSampleSizeList = [sampleSizeList[i]]
-            baseList.extend(baseListNew)
-            BAGList.extend(BAGListNew)
-            ReBAGList.extend(ReBAGListNew)
-            ReBAGSList.extend(ReBAGSListNew)
-            sampleSizeFinished.extend(evalSampleSizeList)
-            i += 1
 
-            dumpTrainingResults(baseList, 
-                                BAGList, 
-                                ReBAGList, 
-                                ReBAGSList,
-                                sampleSizeFinished, 
-                                kList, 
-                                BList, 
-                                k12List, 
-                                B12List, 
-                                numReplicates,
-                                trainingResultFile)
-        
+    try:
+        i = 0
+        while i < len(sampleSizeList):
+            checkKiller()
 
-        baseObjListNew, BAGObjListNew, ReBAGObjListNew, ReBAGSObjListNew, baseObjAvgNew, BAGObjAvgNew, ReBAGObjAvgNew, ReBAGSObjAvgNew = runEvaluation(baseTrainer,
-                                                                                                                                                       baseListNew, 
-                                                                                                                                                       BAGListNew, 
-                                                                                                                                                       ReBAGListNew, 
-                                                                                                                                                       ReBAGSListNew, 
-                                                                                                                                                       evaluator,
-                                                                                                                                                       evalSampleSizeList, 
-                                                                                                                                                       kList, 
-                                                                                                                                                       BList, 
-                                                                                                                                                       k12List, 
-                                                                                                                                                       B12List,
-                                                                                                                                                       numReplicates)
-        
-        baseObjList.extend(baseObjListNew)
-        BAGObjList.extend(BAGObjListNew)
-        ReBAGObjList.extend(ReBAGObjListNew)
-        ReBAGSObjList.extend(ReBAGSObjListNew)
-        baseObjAvg.extend(baseObjAvgNew)
-        BAGObjAvg.extend(BAGObjAvgNew)
-        ReBAGObjAvg.extend(ReBAGObjAvgNew)
-        ReBAGSObjAvg.extend(ReBAGSObjAvgNew)
-        
-        dumpEvalResults(baseObjList, 
-                        BAGObjList, 
-                        ReBAGObjList, 
-                        ReBAGSObjList, 
-                        baseObjAvg, 
+            if i < len(sampleSizeFinished):
+                baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = baseList[:len(sampleSizeFinished)], BAGList[:len(sampleSizeFinished)], ReBAGList[:len(sampleSizeFinished)], ReBAGSList[:len(sampleSizeFinished)]
+                evalSampleSizeList = sampleSizeFinished
+                i = len(sampleSizeFinished)
+            else: 
+                baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = runTraining(baseTrainer, 
+                                                                                   sampler,
+                                                                                   [sampleSizeList[i]], 
+                                                                                   kList, 
+                                                                                   BList, 
+                                                                                   k12List, 
+                                                                                   B12List, 
+                                                                                   numReplicates,
+                                                                                   numParallelTrain = numParallelTrain,
+                                                                                   numParallelEval = numParallelEval)
+                evalSampleSizeList = [sampleSizeList[i]]
+                baseList.extend(baseListNew)
+                BAGList.extend(BAGListNew)
+                ReBAGList.extend(ReBAGListNew)
+                ReBAGSList.extend(ReBAGSListNew)
+                sampleSizeFinished.extend(evalSampleSizeList)
+                i += 1
+
+                dumpTrainingResults(baseList, 
+                                    BAGList, 
+                                    ReBAGList, 
+                                    ReBAGSList,
+                                    sampleSizeFinished, 
+                                    kList, 
+                                    BList, 
+                                    k12List, 
+                                    B12List, 
+                                    numReplicates,
+                                    trainingResultFile)
+            
+
+            baseObjListNew, BAGObjListNew, ReBAGObjListNew, ReBAGSObjListNew, baseObjAvgNew, BAGObjAvgNew, ReBAGObjAvgNew, ReBAGSObjAvgNew = runEvaluation(baseTrainer,
+                                                                                                                                                           baseListNew, 
+                                                                                                                                                           BAGListNew, 
+                                                                                                                                                           ReBAGListNew, 
+                                                                                                                                                           ReBAGSListNew, 
+                                                                                                                                                           evaluator,
+                                                                                                                                                           evalSampleSizeList, 
+                                                                                                                                                           kList, 
+                                                                                                                                                           BList, 
+                                                                                                                                                           k12List, 
+                                                                                                                                                           B12List,
+                                                                                                                                                           numReplicates)
+            
+            baseObjList.extend(baseObjListNew)
+            BAGObjList.extend(BAGObjListNew)
+            ReBAGObjList.extend(ReBAGObjListNew)
+            ReBAGSObjList.extend(ReBAGSObjListNew)
+            baseObjAvg.extend(baseObjAvgNew)
+            BAGObjAvg.extend(BAGObjAvgNew)
+            ReBAGObjAvg.extend(ReBAGObjAvgNew)
+            ReBAGSObjAvg.extend(ReBAGSObjAvgNew)
+            
+            dumpEvalResults(baseObjList, 
+                            BAGObjList, 
+                            ReBAGObjList, 
+                            ReBAGSObjList, 
+                            baseObjAvg, 
+                            BAGObjAvg, 
+                            ReBAGObjAvg, 
+                            ReBAGSObjAvg,
+                            sampleSizeFinished, 
+                            kList, 
+                            BList, 
+                            k12List, 
+                            B12List,
+                            numReplicates,
+                            evalResultFile)
+            
+            plotAverage(baseObjAvg, 
                         BAGObjAvg, 
                         ReBAGObjAvg, 
                         ReBAGSObjAvg,
@@ -448,27 +480,18 @@ def pipeline(resultDir: str,
                         BList, 
                         k12List, 
                         B12List,
-                        numReplicates,
-                        evalResultFile)
-        
-        plotAverage(baseObjAvg, 
-                    BAGObjAvg, 
-                    ReBAGObjAvg, 
-                    ReBAGSObjAvg,
+                        avgFigPath)
+            
+            plotCDF(baseObjList, 
+                    BAGObjList, 
+                    ReBAGObjList, 
+                    ReBAGSObjList, 
                     sampleSizeFinished, 
                     kList, 
                     BList, 
                     k12List, 
                     B12List,
-                    avgFigPath)
-        
-        plotCDF(baseObjList, 
-                BAGObjList, 
-                ReBAGObjList, 
-                ReBAGSObjList, 
-                sampleSizeFinished, 
-                kList, 
-                BList, 
-                k12List, 
-                B12List,
-                cdfFigPath)
+                    cdfFigPath)
+            
+    except KilledByUser:
+        logger.info("The experiment is killed")
