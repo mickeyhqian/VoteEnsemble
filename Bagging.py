@@ -4,7 +4,6 @@ from numpy.typing import NDArray
 from multiprocessing import Process, Queue
 import pickle
 import os
-import shutil
 from zstandard import ZstdCompressor, ZstdDecompressor
 from typing import List, Any, Tuple, Union
 
@@ -17,11 +16,10 @@ class BaseTrainer(metaclass = ABCMeta):
         The training algorithm.
 
         Args:
-
-            sample: A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
+            sample: 
+                A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
 
         Returns:
-
             A training result of any type, e.g., a solution scalar/vector (for optimization problems) or a machine learning model (for machine learning problems).
         """
         pass
@@ -32,17 +30,13 @@ class BaseTrainer(metaclass = ABCMeta):
         """
         Property of whether or not to deduplicate training results from subsamples using the self.isDuplicate method.
 
-        Use with BAG and ReBAG:
-
-            BAG: BAG only accepts base trainers with self.enableDeduplication = True.
-
-            ReBAG: ReBAG accepts any base trainer, but setting self.enableDeduplication = True when appropriate can reduce the computation.
+        - Use with BAG and ReBAG:
+            - BAG: BAG only accepts base trainers with self.enableDeduplication = True.
+            - ReBAG: ReBAG accepts any base trainer, but setting self.enableDeduplication = True when appropriate can reduce the computation.
             
-        Examples suggested to set self.enableDeduplication = True:
-
-            Training problems with discrete spaces, such as combinatorial/integer optimization.
-
-            Training problems with continuous spaces but training results selected from a discrete subspace, such as linear programs solved with the simplex method.
+        - Examples suggested to set self.enableDeduplication = True:
+            - Training problems with discrete spaces, such as combinatorial/integer optimization.
+            - Training problems with continuous spaces but training results selected from a discrete subspace, such as linear programs solved with the simplex method.
         """
         pass
 
@@ -54,11 +48,10 @@ class BaseTrainer(metaclass = ABCMeta):
         Invoked only if self.enableDeduplication = True, can be arbitrarily defined otherwise.
 
         Args:
-
-            result1, result2: Each being a training result output by self.train.
+            result1, result2: 
+                Each is a training result output by self.train.
 
         Returns:
-
             True/False
         """
         pass
@@ -72,13 +65,12 @@ class BaseTrainer(metaclass = ABCMeta):
         Invoked in ReBAG only.
 
         Args:
-
-            trainingResult: A training result output by self.train.
-
-            sample: A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
+            trainingResult: 
+                A training result output by self.train.
+            sample: 
+                A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
 
         Returns:
-
             The training objective value.
         """
         pass
@@ -102,11 +94,10 @@ class BaseTrainer(metaclass = ABCMeta):
         The default implementation directly returns trainingResult, and is to be overridden if trainingResult is not pickleable.
 
         Args:
-
-            trainingResult: A training result output by self.train.
+            trainingResult: 
+                A training result output by self.train.
 
         Returns:
-
             A pickleable representation of the training result.
         """
         return trainingResult
@@ -120,11 +111,10 @@ class BaseTrainer(metaclass = ABCMeta):
         The default implementation directly returns pickleableTrainingResult, and is to be overridden accordingly if toPickleable is overridden.
 
         Args:
-
-            pickleableTrainingResult: A pickleable representation of a training result output by self.train.
+            pickleableTrainingResult: 
+                A pickleable representation of a training result output by self.train.
 
         Returns:
-
             A training result.
         """
         return pickleableTrainingResult
@@ -134,10 +124,10 @@ class BaseTrainer(metaclass = ABCMeta):
         Dumps a training result to a file.
 
         Args:
-
-            trainingResult: A training result output by self.train.
-
-            destFile: Path of a file to dump the training result into.
+            trainingResult: 
+                A training result output by self.train.
+            destFile: 
+                Path of a file to dump the training result into.
         """
         result = pickle.dumps(self.toPickleable(trainingResult))
         compressor = ZstdCompressor()
@@ -150,11 +140,10 @@ class BaseTrainer(metaclass = ABCMeta):
         Loads a training result from a file.
 
         Args:
-
-            sourceFile: Path of a file to load the training result from.
+            sourceFile: 
+                Path of a file to load the training result from.
 
         Returns:
-
             A training result.
         """
         with open(sourceFile, "rb") as f:
@@ -172,16 +161,16 @@ class BaseBagging(metaclass = ABCMeta):
                  deleteSubsampleResults: bool = True):
         """
         Args:
-
-            baseTrainer: A base trainer of type BaseTrainer.
-
-            numParallelTrain: Number of processes used for parallel training. A value <= 1 disables parallel training, default 1.
-
-            randomState: A random number generator or a seed to be used to initialize a random number generator. Default None, random initial state.
-
-            subsampleResultsDir: A directory where training results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the training results are kept in RAM.
-
-            deleteSubsampleResults: Whether to delete training results on subsamples once bagging finishes when subsampleResultsDir is not None.
+            baseTrainer: 
+                A base trainer of type BaseTrainer.
+            numParallelTrain: 
+                Number of processes used for parallel training. A value <= 1 disables parallel training, default 1.
+            randomState: 
+                A random number generator or a seed to be used to initialize a random number generator. Default None, random initial state.
+            subsampleResultsDir: 
+                A directory where training results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the training results are kept in RAM.
+            deleteSubsampleResults: 
+                Whether to delete training results on subsamples once bagging finishes when subsampleResultsDir is not None.
         """
         if not isinstance(baseTrainer, BaseTrainer):
             raise ValueError(f"baseTrainer must be of type {BaseTrainer.__name__}")
@@ -302,15 +291,14 @@ class BAG(BaseBagging):
         Run BAG on the base trainer.
 
         Args:
-
-            sample: A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
-
-            k: Subsample size.
-
-            B: Number of subsamples to draw.
+            sample: 
+                A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
+            k: 
+                Subsample size.
+            B: 
+                Number of subsamples to draw.
 
         Returns:
-
             A bagged training result.
         """
         self._prepareSubsampleResultDir()
@@ -367,20 +355,20 @@ class ReBAG(BaseBagging):
                  deleteSubsampleResults: bool = True):
         """
         Args:
-
-            baseTrainer: A base trainer of type BaseTrainer.
-
-            dataSplit: Whether or not (ReBAG-S vs ReBAG) to split the data across the model candidate retrieval phase and the majority-vote phase.
-
-            numParallelEval: Number of processes used for parallel evaluation of training objectives. A value <= 1 disables parallel evaluation. Default 1.
-
-            numParallelTrain: Number of processes used for parallel training. A value <= 1 disables parallel training, default 1.
-
-            randomState: A random number generator or a seed to be used to initialize a random number generator. Default None, random initial state.
-
-            subsampleResultsDir: A directory where training results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the training results are kept in RAM.
-
-            deleteSubsampleResults: Whether to delete training results on subsamples once bagging finishes when subsampleResultsDir is not None.
+            baseTrainer: 
+                A base trainer of type BaseTrainer.
+            dataSplit: 
+                Whether or not (ReBAG-S vs ReBAG) to split the data across the model candidate retrieval phase and the majority-vote phase.
+            numParallelEval: 
+                Number of processes used for parallel evaluation of training objectives. A value <= 1 disables parallel evaluation. Default 1.
+            numParallelTrain: 
+                Number of processes used for parallel training. A value <= 1 disables parallel training, default 1.
+            randomState: 
+                A random number generator or a seed to be used to initialize a random number generator. Default None, random initial state.
+            subsampleResultsDir: 
+                A directory where training results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the training results are kept in RAM.
+            deleteSubsampleResults: 
+                Whether to delete training results on subsamples once bagging finishes when subsampleResultsDir is not None. Default True.
         """
         super().__init__(baseTrainer, 
                          numParallelTrain = numParallelTrain, 
@@ -494,23 +482,22 @@ class ReBAG(BaseBagging):
         Run ReBAG (self._dataSplit = False) or ReBAG-S (self._dataSplit = True) on the base trainer.
 
         Args:
-
-            sample: A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
-
-            k1: Subsample size for the model candidate retrieval phase.
-
-            k2: Subsample size for the majority-vote phase.
-
-            B1: Number of subsamples to draw in the model candidate retrieval phase.
-
-            B2: Number of subsamples to draw in the majority-vote phase.
-
-            epsilon: The suboptimality threshold. Any value < 0 leads to auto-selection, default -1.0.
-
-            autoEpsilonProb: The probability threshold guiding the auto-selection of epsilon, default 0.5.
+            sample: 
+                A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
+            k1: 
+                Subsample size for the model candidate retrieval phase.
+            k2: 
+                Subsample size for the majority-vote phase.
+            B1: 
+                Number of subsamples to draw in the model candidate retrieval phase.
+            B2: 
+                Number of subsamples to draw in the majority-vote phase.
+            epsilon: 
+                The suboptimality threshold. Any value < 0 leads to auto-selection. Default -1.0.
+            autoEpsilonProb: 
+                The probability threshold guiding the auto-selection of epsilon. Default 0.5.
 
         Returns:
-
             A bagged training result.
         """
         sample = np.asarray(sample)
