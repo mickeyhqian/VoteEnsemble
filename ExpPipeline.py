@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 import pickle
 import matplotlib.pyplot as plt
 import os
-from typing import List, Tuple, Callable, Any
+from typing import List, Tuple, Callable, Any, Union
 import logging
 logger = logging.getLogger(name = "Bagging")
 
@@ -44,12 +44,15 @@ def runTraining(baseTrainer: BaseTrainer,
                 k12List: List[Tuple[Tuple[int, float], Tuple[int, float]]], 
                 B12List: List[Tuple[int, int]], 
                 numReplicates: int,
+                resultDir: str,
                 numParallelTrain: int = 1,
-                numParallelEval: int = 1):
+                numParallelEval: int = 1,
+                subsampleResultsDir: Union[str, None] = None):
     baseList = [[] for _ in range(len(sampleSizeList))]
     BAGList = [[[[] for _ in range(len(kList))] for _ in range(len(BList))] for _ in range(len(sampleSizeList))]
     ReBAGList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
     ReBAGSList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
+    os.makedirs(resultDir, exist_ok = True)
 
     for i in range(len(sampleSizeList)):
         n = sampleSizeList[i]
@@ -58,39 +61,54 @@ def runTraining(baseTrainer: BaseTrainer,
             sample = sampler(n, sampleRNG)
             
             checkKiller()
-            baseResult = baseTrainer.train(sample)
-            if baseResult is None:
-                raise RuntimeError(f"base training failed for sample size {n}, replication {j}")
-            baseList[i].append(baseTrainer.toPickleable(baseResult))
+            resultFile = os.path.join(resultDir, f"base_{n}_{j}")
+            if not os.path.isfile(resultFile):
+                trainResult = baseTrainer.train(sample)
+                if trainResult is None:
+                    raise RuntimeError(f"base training failed for sample size {n}, replication {j}")
+                baseTrainer.dumpTrainingResult(trainResult, resultFile)
+            baseList[i].append(resultFile)
             logger.info(f"Finish base training for sample size {n}, replication {j}")
 
             for ind1, B in enumerate(BList):
                 for ind2, (base, ratio) in enumerate(kList):
                     k = max(base, int(n * ratio))
-                    bag = BAG(baseTrainer, numParallelTrain = numParallelTrain, randomState = 666)
+                    bag = BAG(baseTrainer, numParallelTrain = numParallelTrain, randomState = 666, subsampleResultsDir = subsampleResultsDir)
 
                     checkKiller()
-                    BAGList[i][ind1][ind2].append(baseTrainer.toPickleable(bag.run(sample, k, B)))
+                    resultFile = os.path.join(resultDir, f"BAG_{n}_{j}_{B}_{k}")
+                    if not os.path.isfile(resultFile):
+                        trainResult = bag.run(sample, k, B)
+                        baseTrainer.dumpTrainingResult(trainResult, resultFile)
+                    BAGList[i][ind1][ind2].append(resultFile)
                     logger.info(f"Finish BAG training for sample size {n}, replication {j}, B={B}, k={k}")
 
             for ind1, (B1, B2) in enumerate(B12List):
                 for ind2, ((base1, ratio1), (base2, ratio2)) in enumerate(k12List):
                     k1 = max(base1, int(n * ratio1))
                     k2 = max(base2, int(n * ratio2))
-                    rebag = ReBAG(baseTrainer, False, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666)
+                    rebag = ReBAG(baseTrainer, False, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666, subsampleResultsDir = subsampleResultsDir)
                     
                     checkKiller()
-                    ReBAGList[i][ind1][ind2].append(baseTrainer.toPickleable(rebag.run(sample, k1, k2, B1, B2)))
+                    resultFile = os.path.join(resultDir, f"ReBAG_{n}_{j}_{B1}_{B2}_{k1}_{k2}")
+                    if not os.path.isfile(resultFile):
+                        trainResult = rebag.run(sample, k1, k2, B1, B2)
+                        baseTrainer.dumpTrainingResult(trainResult, resultFile)
+                    ReBAGList[i][ind1][ind2].append(resultFile)
                     logger.info(f"Finish ReBAG training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}")
 
             for ind1, (B1, B2) in enumerate(B12List):
                 for ind2, ((base1, ratio1), (base2, ratio2)) in enumerate(k12List):
                     k1 = max(base1, int(n / 2 * ratio1))
                     k2 = max(base2, int(n / 2 * ratio2))
-                    rebags = ReBAG(baseTrainer, True, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666)
+                    rebags = ReBAG(baseTrainer, True, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666, subsampleResultsDir = subsampleResultsDir)
 
                     checkKiller()
-                    ReBAGSList[i][ind1][ind2].append(baseTrainer.toPickleable(rebags.run(sample, k1, k2, B1, B2)))
+                    resultFile = os.path.join(resultDir, f"ReBAG-S_{n}_{j}_{B1}_{B2}_{k1}_{k2}")
+                    if not os.path.isfile(resultFile):
+                        trainResult = rebags.run(sample, k1, k2, B1, B2)
+                        baseTrainer.dumpTrainingResult(trainResult, resultFile)
+                    ReBAGSList[i][ind1][ind2].append(resultFile)
                     logger.info(f"Finish ReBAG-S training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}")
 
     return baseList, BAGList, ReBAGList, ReBAGSList
@@ -124,22 +142,22 @@ def runEvaluation(baseTrainer: BaseTrainer,
     for i in range(len(sampleSizeList)):
         for j in range(numReplicates):
             checkKiller()
-            baseObjList[i].append(evaluator(baseTrainer.fromPickleable(baseList[i][j])))
+            baseObjList[i].append(evaluator(baseTrainer.loadTrainingResult(baseList[i][j])))
             logger.info(f"Finish base evaluation for sample size {sampleSizeList[i]}, replication {j}")
 
             for ind1 in range(len(BList)):
                 for ind2 in range(len(kList)):
                     checkKiller()
-                    BAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.fromPickleable(BAGList[i][ind1][ind2][j])))
+                    BAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(BAGList[i][ind1][ind2][j])))
                     logger.info(f"Finish BAG evaluation for sample size {sampleSizeList[i]}, replication {j}, B={BList[ind1]}, k={kList[ind2]}")
 
             for ind1 in range(len(B12List)):
                 for ind2 in range(len(k12List)):
                     checkKiller()
-                    ReBAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.fromPickleable(ReBAGList[i][ind1][ind2][j])))
+                    ReBAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(ReBAGList[i][ind1][ind2][j])))
                     logger.info(f"Finish ReBAG evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12 = {k12List[ind2]}")
                     checkKiller()
-                    ReBAGSObjList[i][ind1][ind2].append(evaluator(baseTrainer.fromPickleable(ReBAGSList[i][ind1][ind2][j])))
+                    ReBAGSObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(ReBAGSList[i][ind1][ind2][j])))
                     logger.info(f"Finish ReBAG-S evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12 = {k12List[ind2]}")
     
         baseObjAvg[i] = np.mean(baseObjList[i])
@@ -152,34 +170,6 @@ def runEvaluation(baseTrainer: BaseTrainer,
                 ReBAGSObjAvg[i][ind1][ind2] = np.mean(ReBAGSObjList[i][ind1][ind2])
 
     return baseObjList, BAGObjList, ReBAGObjList, ReBAGSObjList, baseObjAvg, BAGObjAvg, ReBAGObjAvg, ReBAGSObjAvg
-
-
-def dumpTrainingResults(baseList: List, 
-                        BAGList: List, 
-                        ReBAGList: List, 
-                        ReBAGSList: List,
-                        sampleSizeList: List[int], 
-                        kList: List[Tuple[int, float]], 
-                        BList: List[int], 
-                        k12List: List[Tuple[Tuple[int, float], Tuple[int, float]]], 
-                        B12List: List[Tuple[int, int]], 
-                        numReplicates: int,
-                        filePath: str):
-    os.makedirs(os.path.dirname(filePath), exist_ok = True)
-    with open(filePath, "wb") as f:
-        pickle.dump((
-            baseList,
-            BAGList, 
-            ReBAGList, 
-            ReBAGSList,
-            sampleSizeList, 
-            kList, 
-            BList, 
-            k12List, 
-            B12List, 
-            numReplicates,
-        ), f)
-    logger.info(f"dumped training results to {filePath}")
 
 
 def dumpEvalResults(baseObjList: List, 
@@ -345,13 +335,17 @@ def pipeline(resultDir: str,
              B12List: List, 
              numReplicates: int,
              numParallelTrain: int = 1,
-             numParallelEval: int = 1):
+             numParallelEval: int = 1,
+             dumpSubsampleResults: bool = False):
 
     baseList = [] 
     BAGList = []
     ReBAGList = []
     ReBAGSList = []
-    trainingResultFile = os.path.join(resultDir, "trainingResults.pkl")
+    trainingResultDir = os.path.join(resultDir, "trainingResults")
+    subsampleResultsDir = None
+    if dumpSubsampleResults:
+        subsampleResultsDir = os.path.join(resultDir, "subsampleResults")
 
     baseObjList = []
     BAGObjList = []
@@ -368,70 +362,29 @@ def pipeline(resultDir: str,
     avgFigPath = os.path.join(resultDir, "avgPlot.png")
     cdfFigPath = os.path.join(resultDir, "cdfPlot.png")
 
-    if os.path.isfile(trainingResultFile):
-        trainingResults = loadResults(trainingResultFile)
-        if len(trainingResults) == 11:
-            trainingResults = trainingResults[1:]
-        (
-            baseList, 
-            BAGList, 
-            ReBAGList, 
-            ReBAGSList,
-            sampleSizeFinished, 
-            _, 
-            _, 
-            _, 
-            _, 
-            _,
-        ) = trainingResults
-        logger.info("Loaded existing training results")
-
-    for i in range(len(sampleSizeFinished)):
-        if i >= len(sampleSizeList) or sampleSizeFinished[i] != sampleSizeList[i]:
-            raise ValueError("incorrect existing training results")
-
     GracefulKiller.setup()
 
     try:
-        i = 0
-        while i < len(sampleSizeList):
+        for sampleSize in sampleSizeList:
             checkKiller()
 
-            if i < len(sampleSizeFinished):
-                baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = baseList[:len(sampleSizeFinished)], BAGList[:len(sampleSizeFinished)], ReBAGList[:len(sampleSizeFinished)], ReBAGSList[:len(sampleSizeFinished)]
-                evalSampleSizeList = sampleSizeFinished
-                i = len(sampleSizeFinished)
-            else: 
-                baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = runTraining(baseTrainer, 
-                                                                                   sampler,
-                                                                                   [sampleSizeList[i]], 
-                                                                                   kList, 
-                                                                                   BList, 
-                                                                                   k12List, 
-                                                                                   B12List, 
-                                                                                   numReplicates,
-                                                                                   numParallelTrain = numParallelTrain,
-                                                                                   numParallelEval = numParallelEval)
-                evalSampleSizeList = [sampleSizeList[i]]
-                baseList.extend(baseListNew)
-                BAGList.extend(BAGListNew)
-                ReBAGList.extend(ReBAGListNew)
-                ReBAGSList.extend(ReBAGSListNew)
-                sampleSizeFinished.extend(evalSampleSizeList)
-                i += 1
+            baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = runTraining(baseTrainer, 
+                                                                               sampler,
+                                                                               [sampleSize], 
+                                                                               kList, 
+                                                                               BList, 
+                                                                               k12List, 
+                                                                               B12List, 
+                                                                               numReplicates,
+                                                                               trainingResultDir,
+                                                                               numParallelTrain = numParallelTrain,
+                                                                               numParallelEval = numParallelEval,
+                                                                               subsampleResultsDir = subsampleResultsDir)
 
-                dumpTrainingResults(baseList, 
-                                    BAGList, 
-                                    ReBAGList, 
-                                    ReBAGSList,
-                                    sampleSizeFinished, 
-                                    kList, 
-                                    BList, 
-                                    k12List, 
-                                    B12List, 
-                                    numReplicates,
-                                    trainingResultFile)
-            
+            baseList.extend(baseListNew)
+            BAGList.extend(BAGListNew)
+            ReBAGList.extend(ReBAGListNew)
+            ReBAGSList.extend(ReBAGSListNew)
 
             baseObjListNew, BAGObjListNew, ReBAGObjListNew, ReBAGSObjListNew, baseObjAvgNew, BAGObjAvgNew, ReBAGObjAvgNew, ReBAGSObjAvgNew = runEvaluation(baseTrainer,
                                                                                                                                                            baseListNew, 
@@ -439,7 +392,7 @@ def pipeline(resultDir: str,
                                                                                                                                                            ReBAGListNew, 
                                                                                                                                                            ReBAGSListNew, 
                                                                                                                                                            evaluator,
-                                                                                                                                                           evalSampleSizeList, 
+                                                                                                                                                           [sampleSize], 
                                                                                                                                                            kList, 
                                                                                                                                                            BList, 
                                                                                                                                                            k12List, 
@@ -454,6 +407,8 @@ def pipeline(resultDir: str,
             BAGObjAvg.extend(BAGObjAvgNew)
             ReBAGObjAvg.extend(ReBAGObjAvgNew)
             ReBAGSObjAvg.extend(ReBAGSObjAvgNew)
+
+            sampleSizeFinished.append(sampleSize)
             
             dumpEvalResults(baseObjList, 
                             BAGObjList, 

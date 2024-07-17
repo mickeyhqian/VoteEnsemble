@@ -2,6 +2,10 @@ from abc import abstractmethod, ABCMeta
 import numpy as np
 from numpy.typing import NDArray
 from multiprocessing import Process, Queue
+import pickle
+import os
+import shutil
+from zstandard import ZstdCompressor, ZstdDecompressor
 from typing import List, Any, Tuple, Union
 
 
@@ -48,6 +52,14 @@ class BaseTrainer(metaclass = ABCMeta):
         Returns whether two training results are considered duplicates of each other.
         
         Invoked only if self.enableDeduplication = True, can be arbitrarily defined otherwise.
+
+        Args:
+
+            result1, result2: Each being a training result output by self.train.
+
+        Returns:
+
+            True/False
         """
         pass
 
@@ -61,7 +73,7 @@ class BaseTrainer(metaclass = ABCMeta):
 
         Args:
 
-            trainingResult: A training result of any type, e.g., a solution scalar/vector (for optimization problems) or a machine learning model (for machine learning problems).
+            trainingResult: A training result output by self.train.
 
             sample: A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
 
@@ -85,9 +97,17 @@ class BaseTrainer(metaclass = ABCMeta):
         """
         Transforms a training result to a pickleable object (e.g., basic python types).
 
-        Invoked only if parallel training/evaluation is enabled in BAG/ReBAG.
+        Invoked only if parallel training/evaluation is enabled or subsampleResultsDir is provided in BAG/ReBAG.
 
         The default implementation directly returns trainingResult, and is to be overridden if trainingResult is not pickleable.
+
+        Args:
+
+            trainingResult: A training result output by self.train.
+
+        Returns:
+
+            A pickleable representation of the training result.
         """
         return trainingResult
 
@@ -95,15 +115,61 @@ class BaseTrainer(metaclass = ABCMeta):
         """
         The inverse of toPickleable.
 
-        Invoked only if parallel training/evaluation is enabled in BAG/ReBAG.
+        Invoked only if parallel training/evaluation is enabled or subsampleResultsDir is provided in BAG/ReBAG.
 
         The default implementation directly returns pickleableTrainingResult, and is to be overridden accordingly if toPickleable is overridden.
+
+        Args:
+
+            pickleableTrainingResult: A pickleable representation of a training result output by self.train.
+
+        Returns:
+
+            A training result.
         """
         return pickleableTrainingResult
+    
+    def dumpTrainingResult(self, trainingResult: Any, destFile: str):
+        """
+        Dumps a training result to a file.
+
+        Args:
+
+            trainingResult: A training result output by self.train.
+
+            destFile: Path of a file to dump the training result into.
+        """
+        result = pickle.dumps(self.toPickleable(trainingResult))
+        compressor = ZstdCompressor()
+        result = compressor.compress(result)
+        with open(destFile, "wb") as f:
+            f.write(result)
+
+    def loadTrainingResult(self, sourceFile: str) -> Any:
+        """
+        Loads a training result from a file.
+
+        Args:
+
+            sourceFile: Path of a file to load the training result from.
+
+        Returns:
+
+            A training result.
+        """
+        with open(sourceFile, "rb") as f:
+            result = f.read()
+        decompressor = ZstdDecompressor()
+        result = decompressor.decompress(result)
+        return self.fromPickleable(pickle.loads(result))
 
 
 class BaseBagging(metaclass = ABCMeta):
-    def __init__(self, baseTrainer: BaseTrainer, numParallelTrain: int = 1, randomState: Union[np.random.Generator, int, None] = None):
+    def __init__(self, baseTrainer: BaseTrainer, 
+                 numParallelTrain: int = 1, 
+                 randomState: Union[np.random.Generator, int, None] = None, 
+                 subsampleResultsDir: Union[str, None] = None, 
+                 deleteSubsampleResults: bool = True):
         """
         Args:
 
@@ -112,6 +178,10 @@ class BaseBagging(metaclass = ABCMeta):
             numParallelTrain: Number of processes used for parallel training. A value <= 1 disables parallel training, default 1.
 
             randomState: A random number generator or a seed to be used to initialize a random number generator. Default None, random initial state.
+
+            subsampleResultsDir: A directory where training results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the training results are kept in RAM.
+
+            deleteSubsampleResults: Whether to delete training results on subsamples once bagging finishes when subsampleResultsDir is not None.
         """
         if not isinstance(baseTrainer, BaseTrainer):
             raise ValueError(f"baseTrainer must be of type {BaseTrainer.__name__}")
@@ -124,6 +194,8 @@ class BaseBagging(metaclass = ABCMeta):
         else:
             self._rng = np.random.default_rng()
         self._rngState = self._rng.bit_generator.state
+        self._subsampleResultsDir: Union[str, None] = subsampleResultsDir
+        self._deleteSubsampleResults: bool = deleteSubsampleResults
     
     def resetRandomState(self):
         """
@@ -131,11 +203,30 @@ class BaseBagging(metaclass = ABCMeta):
         """
         self._rng.bit_generator.state = self._rngState
 
+    def _prepareSubsampleResultDir(self):
+        if self._subsampleResultsDir is not None:
+            os.makedirs(self._subsampleResultsDir, exist_ok = True)
+
+    def _subsampleResultPath(self, index: int) -> str:
+        if self._subsampleResultsDir is None:
+            raise RuntimeError("subsampleResultsDir is not provided")
+        return os.path.join(self._subsampleResultsDir, f"subsampleResult_{index}")
+
+    def _dumpSubsampleResult(self, trainingResult: Any, index: int):
+        self._baseTrainer.dumpTrainingResult(trainingResult, self._subsampleResultPath(index))
+
+    def _loadSubsampleResult(self, index: int) -> Any:
+        return self._baseTrainer.loadTrainingResult(self._subsampleResultPath(index))
+
     def _subProcessTrain(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
         for index, subsampleIndices in subsampleList:
             trainingResult = self._baseTrainer.train(sample[subsampleIndices])
             if trainingResult is not None:
-                trainingResult = self._baseTrainer.toPickleable(trainingResult)
+                if self._subsampleResultsDir is None:
+                    trainingResult = self._baseTrainer.toPickleable(trainingResult)
+                else:
+                    self._dumpSubsampleResult(trainingResult, index)
+                    trainingResult = True
             queue.put((index, trainingResult))
 
     def _trainOnSubsamples(self, sample: NDArray, k: int, B: int) -> List:
@@ -159,7 +250,11 @@ class BaseBagging(metaclass = ABCMeta):
         if len(subsampleLists) <= 1:
             for subsampleList in subsampleLists:
                 for index, subsampleIndices in subsampleList:
-                    trainingResultList[index] = self._baseTrainer.train(sample[subsampleIndices])
+                    trainingResult = self._baseTrainer.train(sample[subsampleIndices])
+                    if trainingResult is not None and self._subsampleResultsDir is not None:
+                        self._dumpSubsampleResult(trainingResult, index)
+                        trainingResult = index
+                    trainingResultList[index] = trainingResult
         else:
             queue = Queue()
             processList: List[Process] = [Process(target = self._subProcessTrain, args = (sample, subsampleList, queue), daemon = True) for subsampleList in subsampleLists]
@@ -170,7 +265,10 @@ class BaseBagging(metaclass = ABCMeta):
             for _ in range(B):
                 index, trainingResult = queue.get()
                 if trainingResult is not None:
-                    trainingResultList[index] = self._baseTrainer.fromPickleable(trainingResult)
+                    if self._subsampleResultsDir is None:
+                        trainingResultList[index] = self._baseTrainer.fromPickleable(trainingResult)
+                    else:
+                        trainingResultList[index] = index
 
             for process in processList:
                 process.join()
@@ -186,8 +284,16 @@ class BaseBagging(metaclass = ABCMeta):
 
 
 class BAG(BaseBagging):
-    def __init__(self, baseTrainer: BaseTrainer, numParallelTrain: int = 1, randomState: Union[np.random.Generator, int, None] = None):
-        super().__init__(baseTrainer, numParallelTrain = numParallelTrain, randomState = randomState)
+    def __init__(self, baseTrainer: BaseTrainer, 
+                 numParallelTrain: int = 1, 
+                 randomState: Union[np.random.Generator, int, None] = None,
+                 subsampleResultsDir: Union[str, None] = None, 
+                 deleteSubsampleResults: bool = True):
+        super().__init__(baseTrainer, 
+                         numParallelTrain = numParallelTrain, 
+                         randomState = randomState, 
+                         subsampleResultsDir = subsampleResultsDir, 
+                         deleteSubsampleResults = deleteSubsampleResults)
         if not self._baseTrainer.enableDeduplication:
             raise ValueError("BAG does not accept base trainers with enableDeduplication = False")
 
@@ -207,6 +313,8 @@ class BAG(BaseBagging):
 
             A bagged training result.
         """
+        self._prepareSubsampleResultDir()
+
         trainingResults = self._trainOnSubsamples(np.asarray(sample), k, B)
 
         if len(trainingResults) == 0:
@@ -216,9 +324,15 @@ class BAG(BaseBagging):
         maxIndex = 0
         maxCount = 0
         for i in range(len(trainingResults)):
+            result1 = trainingResults[i]
+            if self._subsampleResultsDir is not None:
+                result1 = self._loadSubsampleResult(result1)
             index = len(indexCountPairs)
             for j in range(len(indexCountPairs)):
-                if self._baseTrainer.isDuplicate(trainingResults[i], trainingResults[indexCountPairs[j][0]]):
+                result2 = trainingResults[indexCountPairs[j][0]]
+                if self._subsampleResultsDir is not None:
+                    result2 = self._loadSubsampleResult(result2)
+                if self._baseTrainer.isDuplicate(result1, result2):
                     index = j
                     break
                     
@@ -231,11 +345,26 @@ class BAG(BaseBagging):
                 maxIndex = indexCountPairs[index][0]
                 maxCount = indexCountPairs[index][1]
         
-        return trainingResults[maxIndex]
+        if self._subsampleResultsDir is None:
+            return trainingResults[maxIndex]
+        else:
+            output = self._loadSubsampleResult(trainingResults[maxIndex])
+            if self._deleteSubsampleResults:
+                for index in trainingResults:
+                    resultPath = self._subsampleResultPath(index)
+                    if os.path.isfile(resultPath):
+                        os.remove(resultPath)
+            return output
 
 
 class ReBAG(BaseBagging):
-    def __init__(self, baseTrainer: BaseTrainer, dataSplit: bool, numParallelEval: int = 1, numParallelTrain: int = 1, randomState: Union[np.random.Generator, int, None] = None):
+    def __init__(self, baseTrainer: BaseTrainer, 
+                 dataSplit: bool, 
+                 numParallelEval: int = 1, 
+                 numParallelTrain: int = 1, 
+                 randomState: Union[np.random.Generator, int, None] = None,
+                 subsampleResultsDir: Union[str, None] = None, 
+                 deleteSubsampleResults: bool = True):
         """
         Args:
 
@@ -248,16 +377,31 @@ class ReBAG(BaseBagging):
             numParallelTrain: Number of processes used for parallel training. A value <= 1 disables parallel training, default 1.
 
             randomState: A random number generator or a seed to be used to initialize a random number generator. Default None, random initial state.
+
+            subsampleResultsDir: A directory where training results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the training results are kept in RAM.
+
+            deleteSubsampleResults: Whether to delete training results on subsamples once bagging finishes when subsampleResultsDir is not None.
         """
-        super().__init__(baseTrainer, numParallelTrain = numParallelTrain, randomState = randomState)
+        super().__init__(baseTrainer, 
+                         numParallelTrain = numParallelTrain, 
+                         randomState = randomState,
+                         subsampleResultsDir = subsampleResultsDir,
+                         deleteSubsampleResults = deleteSubsampleResults)
         self._dataSplit: bool = dataSplit
         self._numParallelEval: int = max(1, int(numParallelEval))
 
     def _subProcessObjective(self, candidateList: List, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
-        candidateList = [self._baseTrainer.fromPickleable(candidate) for candidate in candidateList]
-        for index, subsampleIndices in subsampleList:
-            objectiveList: List[float] = [self._baseTrainer.objective(candidate, sample[subsampleIndices]) for candidate in candidateList]
-            queue.put((index, objectiveList))
+        indexToObj = {entry[0]: [] for entry in subsampleList}
+        for candidate in candidateList:
+            if self._subsampleResultsDir is None:
+                candidate = self._baseTrainer.fromPickleable(candidate)
+            else:
+                candidate = self._loadSubsampleResult(candidate)
+            for index, subsampleIndices in subsampleList:
+                indexToObj[index].append(self._baseTrainer.objective(candidate, sample[subsampleIndices]))
+        
+        for index, objList in indexToObj.items():
+            queue.put((index, objList))
 
     def _objectiveOnSubsamples(self, candidateList: List, sample: NDArray, k: int, B: int) -> NDArray:
         if B <= 0:
@@ -275,16 +419,21 @@ class ReBAG(BaseBagging):
             subsampleLists[processIndex].append((b, newSubsample.tolist()))
             processIndex = (processIndex + 1) % self._numParallelEval
 
-        evalOutputList: List[List[float]] = [None for _ in range(B)]
+        evalOutputList: List[List[float]] = [[] for _ in range(B)]
 
         if len(subsampleLists) <= 1:
-            for subsampleList in subsampleLists:
-                for index, subsampleIndices in subsampleList:
-                    objectiveList: List[float] = [self._baseTrainer.objective(candidate, sample[subsampleIndices]) for candidate in candidateList]
-                    evalOutputList[index] = objectiveList
+            for candidate in candidateList:
+                if self._subsampleResultsDir is not None:
+                    candidate = self._loadSubsampleResult(candidate)
+                for subsampleList in subsampleLists:
+                    for index, subsampleIndices in subsampleList:
+                        evalOutputList[index].append(self._baseTrainer.objective(candidate, sample[subsampleIndices]))
         else:
             queue = Queue()
-            pickleableList = [self._baseTrainer.toPickleable(candidate) for candidate in candidateList]
+            if self._subsampleResultsDir is None:
+                pickleableList = [self._baseTrainer.toPickleable(candidate) for candidate in candidateList]
+            else:
+                pickleableList = candidateList
             processList: List[Process] = [Process(target = self._subProcessObjective, args = (pickleableList, sample, subsampleList, queue), daemon = True) for subsampleList in subsampleLists]
             
             for process in processList:
@@ -375,19 +524,26 @@ class ReBAG(BaseBagging):
             sample1 = sample[:n1]
             sample2 = sample[n1:]
 
+        self._prepareSubsampleResultDir()
+
         trainingResults = self._trainOnSubsamples(sample1, k1, B1)
 
         retrievedList: List = []
         if self._baseTrainer.enableDeduplication:
-            for result1 in trainingResults:
+            for i in range(len(trainingResults)):
+                result1 = trainingResults[i]
+                if self._subsampleResultsDir is not None:
+                    result1 = self._loadSubsampleResult(result1)
                 existing = False
                 for result2 in retrievedList:
+                    if self._subsampleResultsDir is not None:
+                        result2 = self._loadSubsampleResult(result2)
                     if self._baseTrainer.isDuplicate(result1, result2):
                         existing = True
                         break
 
                 if not existing:
-                    retrievedList.append(result1)
+                    retrievedList.append(trainingResults[i])
         else:
             retrievedList = trainingResults
 
@@ -407,4 +563,14 @@ class ReBAG(BaseBagging):
                 epsilon = ReBAG._findEpsilon(gapMatrix, autoEpsilonProb)
     
         probArray = ReBAG._epsilonOptimalProb(gapMatrix, epsilon)
-        return retrievedList[np.argmax(probArray)]
+
+        if self._subsampleResultsDir is None:
+            return retrievedList[np.argmax(probArray)]
+        else:
+            output = self._loadSubsampleResult(retrievedList[np.argmax(probArray)])
+            if self._deleteSubsampleResults:
+                for index in trainingResults:
+                    resultPath = self._subsampleResultPath(index)
+                    if os.path.isfile(resultPath):
+                        os.remove(resultPath)
+            return output

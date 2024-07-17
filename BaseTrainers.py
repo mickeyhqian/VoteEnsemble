@@ -188,6 +188,7 @@ class BaseNN(BaseTrainer):
                 optimizer.step()
 
         model.to(self._cpu)
+        torch.cuda.empty_cache()
         return model
 
     @property
@@ -217,6 +218,7 @@ class BaseNN(BaseTrainer):
         loss = criterion(Ypred, tensorY)
 
         trainingResult.to(self._cpu)
+        torch.cuda.empty_cache()
         return loss.item()
 
     @property

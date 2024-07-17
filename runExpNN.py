@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     rngEval = np.random.default_rng(seed = 777)
 
-    d = 50
+    d = 30
     # meanX = rngProb.uniform(1.1, 1.9, d)
     meanX = np.linspace(1, 100, num = d)
     noiseShape = 2.1
@@ -51,8 +51,8 @@ if __name__ == "__main__":
         return np.hstack((YSample, XSample))
     
     # baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.005, useGPU = True)
-    # baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.005, useGPU = True)
-    baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.005, useGPU = True)
+    baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.005, useGPU = True)
+    # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.005, useGPU = True)
     # baseNN = BaseNN([50, 50], learningRate = 0.005, useGPU = False)
 
     evalSample = evalSampler(1000000)
@@ -80,4 +80,5 @@ if __name__ == "__main__":
              B12List, 
              numReplicates, 
              numParallelTrain = 1, 
-             numParallelEval = 1)
+             numParallelEval = 1,
+             dumpSubsampleResults = True)
