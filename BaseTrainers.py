@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
-from typing import List
+from typing import List, Union
 
     
 
@@ -149,7 +149,7 @@ class RegressionNN(nn.Module):
 
 
 class BaseNN(BaseTrainer):
-    def __init__(self, layerSizes: List[int], batchSize: int = 64, minEpochs: int = 5, maxEpochs: int = 30, learningRate: float = 1e-3, useGPU: bool = True):
+    def __init__(self, layerSizes: List[int], batchSize: int = 64, minEpochs: int = 10, maxEpochs: int = 30, learningRate: float = 1e-3, useGPU: bool = False):
         self._layerSizes: List[int] = layerSizes
         self._batchSize: int = batchSize
         self._minEpochs: int = max(1, minEpochs)
@@ -157,6 +157,19 @@ class BaseNN(BaseTrainer):
         self._learningRate: float = learningRate
         self._device: torch.device = torch.device("cuda" if useGPU and torch.cuda.is_available() else "cpu")
         self._cpu: torch.device = torch.device("cpu")
+
+    def _evaluate(self, trainingResult: RegressionNN, dataloader: DataLoader, device: torch.device) -> float:
+        trainingResult.eval()
+        criterion = nn.MSELoss(reduction = "sum")
+        totalLoss = 0.0
+        with torch.no_grad():
+            for inputs, targets in dataloader:
+                inputs = inputs.to(device)
+                targets = targets.to(device)
+                outputs = trainingResult(inputs)
+                totalLoss += criterion(outputs, targets).item()
+
+        return totalLoss / len(dataloader.dataset)
 
     def train(self, sample: NDArray) -> RegressionNN:
         torch.manual_seed(1109)
@@ -168,19 +181,48 @@ class BaseNN(BaseTrainer):
         criterion = nn.MSELoss()
         optimizer = optim.Adam(model.parameters(), lr = self._learningRate)
 
-        tensorX = torch.Tensor(sample[:, 1:]).to(self._device)
-        tensorY = torch.Tensor(sample[:, :1]).to(self._device)
-        dataset = TensorDataset(tensorX, tensorY)  # Create dataset
-        dataloader = DataLoader(dataset, batch_size = self._batchSize, shuffle = True)  # Create DataLoader
+        trainSize = int(len(sample) * 0.7)
+        validSize = len(sample) - trainSize
+
+        if trainSize < 1 or validSize < 1:
+            raise ValueError(f"Insufficient data: training set size = {trainSize}, validation set size = {validSize}")
+
+        trainTensorX = torch.Tensor(sample[:trainSize, 1:])
+        trainTensorY = torch.Tensor(sample[:trainSize, :1])
+        trainDataset = TensorDataset(trainTensorX, trainTensorY)  # Create dataset
+        trainDataLoader = DataLoader(trainDataset, batch_size = self._batchSize, shuffle = True)  # Create DataLoader
+        # evalDataLoader = DataLoader(trainDataset, batch_size = 131072, shuffle = False)  # Create DataLoader
+
+        validTensorX = torch.Tensor(sample[trainSize:, 1:])
+        validTensorY = torch.Tensor(sample[trainSize:, :1])
+        validDataset = TensorDataset(validTensorX, validTensorY)  # Create dataset
+        validDataLoader = DataLoader(validDataset, batch_size = 131072, shuffle = False)  # Create DataLoader
 
         minSize = 16384
         maxSize = 131072
-        numEpochs = np.log(len(sample) / minSize) * (self._minEpochs - self._maxEpochs) / np.log(maxSize / minSize) + self._maxEpochs
+        numEpochs = np.log(trainSize / minSize) * (self._minEpochs - self._maxEpochs) / np.log(maxSize / minSize) + self._maxEpochs
         numEpochs = max(min(int(numEpochs), self._maxEpochs), self._minEpochs)
 
-        model.train()
-        for _ in range(numEpochs):
-            for inputs, targets in dataloader:
+        bestValidLoss = float("inf")
+        numStall = 0
+        for i in range(numEpochs):
+            # trainLoss = self._evaluate(model, evalDataLoader, self._device)
+            validLoss = self._evaluate(model, validDataLoader, self._device)
+            if i == 0 or validLoss < bestValidLoss * 0.97:
+                bestValidLoss = validLoss
+                numStall = 0
+            else:
+                numStall += 1
+            # logger.info(f"#epochs = {i}, training loss = {trainLoss}, validation loss = {validLoss}, best validation loss = {bestValidLoss}, #stall = {numStall}")
+
+            if numStall >= 3:
+                # logger.info("early stopped due to #stall")
+                break
+
+            model.train()
+            for inputs, targets in trainDataLoader:
+                inputs = inputs.to(self._device)
+                targets = targets.to(self._device)
                 optimizer.zero_grad()
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
@@ -199,29 +241,23 @@ class BaseNN(BaseTrainer):
     def isDuplicate(self):
         pass
 
-    def objective(self, trainingResult: RegressionNN, sample: NDArray) -> float:
-        trainingResult.to(self._device)
-        trainingResult.eval()
+    def objective(self, trainingResult: RegressionNN, sample: NDArray, device: Union[torch.device, None] = None) -> float:
+        if device is None:
+            device = self._device
+
+        trainingResult.to(device)
 
         tensorX = torch.Tensor(sample[:, 1:])
-        tensorY = torch.Tensor(sample[:, :1]).to(self._device)
-        dataset = TensorDataset(tensorX)  # Create dataset
+        tensorY = torch.Tensor(sample[:, :1])
+        dataset = TensorDataset(tensorX, tensorY)  # Create dataset
         dataloader = DataLoader(dataset, batch_size = 131072, shuffle = False)  # Create DataLoader
 
-        YpredList = []
-        with torch.no_grad():
-            for data in dataloader:
-                data = data[0].to(self._device)
-                YpredList.append(trainingResult(data))
-
-        Ypred = torch.cat(YpredList)
-        criterion = nn.MSELoss()
-        loss = criterion(Ypred, tensorY)
+        obj = self._evaluate(trainingResult, dataloader, device)
 
         trainingResult.to(self._cpu)
-        if self._device.type == "cuda":
+        if device.type == "cuda":
             torch.cuda.empty_cache()
-        return loss.item()
+        return obj
 
     @property
     def isMinimization(self):

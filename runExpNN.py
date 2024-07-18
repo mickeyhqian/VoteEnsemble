@@ -7,6 +7,7 @@ from scipy import stats
 from uuid import uuid4
 import sys
 import os
+import torch
 import logging
 logger = logging.getLogger(name = "Bagging")
 
@@ -14,6 +15,8 @@ logger = logging.getLogger(name = "Bagging")
 
 if __name__ == "__main__":
     set_start_method("spawn")
+    torch.set_num_threads(3)
+    torch.set_num_interop_threads(1)
 
     if len(sys.argv) > 1:
         resultDir = sys.argv[1]
@@ -29,7 +32,7 @@ if __name__ == "__main__":
 
     rngEval = np.random.default_rng(seed = 777)
 
-    d = 30
+    d = 50
     # meanX = rngProb.uniform(1.1, 1.9, d)
     meanX = np.linspace(1, 100, num = d)
     noiseShape = 2.1
@@ -50,15 +53,16 @@ if __name__ == "__main__":
         YSample = np.asarray([[trueMapping(x)] for x in XSample])
         return np.hstack((YSample, XSample))
     
-    # baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.005, useGPU = True)
-    baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.005, useGPU = True)
-    # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.005, useGPU = True)
-    # baseNN = BaseNN([50, 50], learningRate = 0.005, useGPU = False)
+    baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.001, useGPU = False)
+    # baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.001, useGPU = False)
+    # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.001, useGPU = False)
+    # baseNN = BaseNN([50, 50], learningRate = 0.001, useGPU = False)
 
     evalSample = evalSampler(1000000)
+    evalDevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def evaluator(trainingResult: RegressionNN) -> float:
-        return baseNN.objective(trainingResult, evalSample)
+        return baseNN.objective(trainingResult, evalSample, device = evalDevice)
 
 
     sampleSizeList = [2**i for i in range(10, 17)]
