@@ -15,7 +15,7 @@ logger = logging.getLogger(name = "Bagging")
 
 if __name__ == "__main__":
     set_start_method("spawn")
-    torch.set_num_threads(3)
+    torch.set_num_threads(4)
     torch.set_num_interop_threads(1)
 
     if len(sys.argv) > 1:
@@ -53,10 +53,10 @@ if __name__ == "__main__":
         YSample = np.asarray([[trueMapping(x)] for x in XSample])
         return np.hstack((YSample, XSample))
     
-    baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.001, useGPU = False)
+    # baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.001, useGPU = False)
     # baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.001, useGPU = False)
     # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.001, useGPU = False)
-    # baseNN = BaseNN([50, 50], learningRate = 0.001, useGPU = False)
+    baseNN = BaseNN([50, 50], learningRate = 0.001, useGPU = False)
 
     evalSample = evalSampler(1000000)
     evalDevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")
