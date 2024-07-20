@@ -47,7 +47,8 @@ def runTraining(baseTrainer: BaseTrainer,
                 resultDir: str,
                 numParallelTrain: int = 1,
                 numParallelEval: int = 1,
-                subsampleResultsDir: Union[str, None] = None):
+                subsampleResultsDir: Union[str, None] = None,
+                runConventionalBagging: bool = False):
     baseList = [[] for _ in range(len(sampleSizeList))]
     BAGList = [[[[] for _ in range(len(kList))] for _ in range(len(BList))] for _ in range(len(sampleSizeList))]
     ReBAGList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
@@ -83,11 +84,18 @@ def runTraining(baseTrainer: BaseTrainer,
                     BAGList[i][ind1][ind2].append(resultFile)
                     logger.info(f"Finish BAG training for sample size {n}, replication {j}, B={B}, k={k}")
 
+            caseSet = set()
             for ind1, (B1, B2) in enumerate(B12List):
                 for ind2, ((base1, ratio1), (base2, ratio2)) in enumerate(k12List):
                     k1 = max(base1, int(n * ratio1))
                     k2 = max(base2, int(n * ratio2))
-                    rebag = ReBAG(baseTrainer, False, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666, subsampleResultsDir = subsampleResultsDir)
+                    deleteSubsampleResults = not runConventionalBagging or (B1, k1) in caseSet
+                    if deleteSubsampleResults:
+                        rebagSubsampleResultsDir = subsampleResultsDir
+                    else:
+                        caseSet.add((B1, k1))
+                        rebagSubsampleResultsDir = os.path.join(subsampleResultsDir, f"ReBAGResults_{n}_{j}_{B1}_{k1}")
+                    rebag = ReBAG(baseTrainer, False, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666, subsampleResultsDir = rebagSubsampleResultsDir, deleteSubsampleResults = deleteSubsampleResults)
                     
                     checkKiller()
                     resultFile = os.path.join(resultDir, f"ReBAG_{n}_{j}_{B1}_{B2}_{k1}_{k2}")
@@ -336,7 +344,8 @@ def pipeline(resultDir: str,
              numReplicates: int,
              numParallelTrain: int = 1,
              numParallelEval: int = 1,
-             dumpSubsampleResults: bool = False):
+             dumpSubsampleResults: bool = False,
+             runConventionalBagging: bool = False):
 
     baseList = [] 
     BAGList = []
@@ -379,7 +388,8 @@ def pipeline(resultDir: str,
                                                                                trainingResultDir,
                                                                                numParallelTrain = numParallelTrain,
                                                                                numParallelEval = numParallelEval,
-                                                                               subsampleResultsDir = subsampleResultsDir)
+                                                                               subsampleResultsDir = subsampleResultsDir,
+                                                                               runConventionalBagging = runConventionalBagging)
 
             baseList.extend(baseListNew)
             BAGList.extend(BAGListNew)
