@@ -262,3 +262,27 @@ class BaseNN(BaseTrainer):
     @property
     def isMinimization(self):
         return True
+    
+    def inference(self, trainingResult: RegressionNN, sample: NDArray, device: Union[torch.device, None] = None) -> torch.Tensor:
+        if device is None:
+            device = self._device
+
+        trainingResult.to(device)
+
+        tensorX = torch.Tensor(sample[:, 1:])
+        dataset = TensorDataset(tensorX)  # Create dataset
+        dataloader = DataLoader(dataset, batch_size = 131072, shuffle = False)  # Create DataLoader
+
+        trainingResult.eval()
+
+        YPred = []
+        with torch.no_grad():
+            for inputs in dataloader:
+                inputs = inputs[0].to(device)
+                outputs = trainingResult(inputs)
+                YPred.append(outputs.to(self._cpu))
+
+        trainingResult.to(self._cpu)
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        return torch.concat(YPred)
