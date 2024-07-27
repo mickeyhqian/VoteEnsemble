@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     rngEval = np.random.default_rng(seed = 777)
 
-    d = 30
+    d = 50
     # meanX = rngProb.uniform(1.1, 1.9, d)
     meanX = np.linspace(1, 100, num = d)
     noiseShape = 2.1
@@ -40,11 +40,11 @@ if __name__ == "__main__":
     def trueMapping(x: NDArray) -> float:
         return np.mean(np.log(x + 1))
 
-    def sampler(n: int, rng: np.random.Generator) -> NDArray:
+    def sampler(n: int, repIdx: int, rng: np.random.Generator) -> NDArray:
         XSample = rng.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
-        noise: NDArray = stats.lomax.rvs(noiseShape, size = n, random_state = rng) \
-            - stats.lomax.rvs(noiseShape, size = n, random_state = rng)
-        # noise: NDArray = rng.normal(size = n)
+        # noise: NDArray = stats.lomax.rvs(noiseShape, size = n, random_state = rng) \
+        #     - stats.lomax.rvs(noiseShape, size = n, random_state = rng)
+        noise: NDArray = rng.normal(size = n)
         YSample = np.asarray([[trueMapping(x)] for x in XSample]) + noise.reshape(-1, 1)
         return np.hstack((YSample, XSample))
     
@@ -53,15 +53,15 @@ if __name__ == "__main__":
         YSample = np.asarray([[trueMapping(x)] for x in XSample])
         return np.hstack((YSample, XSample))
     
-    # baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.001, useGPU = False)
+    baseNN = BaseNN([50, 300, 500, 800, 800, 500, 300, 50], learningRate = 0.001, useGPU = False)
     # baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.001, useGPU = False)
-    baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.001, useGPU = False)
+    # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.001, useGPU = False)
     # baseNN = BaseNN([50, 50], learningRate = 0.001, useGPU = False)
 
     evalSample = evalSampler(1000000)
     evalDevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def evaluator(trainingResult: RegressionNN) -> float:
+    def evaluator(trainingResult: RegressionNN, repIndex: int) -> float:
         return baseNN.objective(trainingResult, evalSample, device = evalDevice)
 
 
@@ -86,4 +86,4 @@ if __name__ == "__main__":
              numParallelTrain = 1, 
              numParallelEval = 1,
              dumpSubsampleResults = True,
-             runConventionalBagging = True)
+             runConventionalBagging = False)

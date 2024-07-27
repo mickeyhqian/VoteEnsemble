@@ -37,7 +37,7 @@ def checkKiller():
 
 
 def runTraining(baseTrainer: BaseTrainer, 
-                sampler: Callable[[int, np.random.Generator], NDArray],
+                sampler: Callable[[int, int, np.random.Generator], NDArray],
                 sampleSizeList: List[int], 
                 kList: List[Tuple[int, float]], 
                 BList: List[int], 
@@ -59,7 +59,7 @@ def runTraining(baseTrainer: BaseTrainer,
         n = sampleSizeList[i]
         sampleRNG = np.random.default_rng(seed = 888)
         for j in range(numReplicates):
-            sample = sampler(n, sampleRNG)
+            sample = sampler(n, j, sampleRNG)
             
             checkKiller()
             resultFile = os.path.join(resultDir, f"base_{n}_{j}")
@@ -127,7 +127,7 @@ def runEvaluation(baseTrainer: BaseTrainer,
                   BAGList: List, 
                   ReBAGList: List, 
                   ReBAGSList: List, 
-                  evaluator: Callable[[Any], float],
+                  evaluator: Callable[[Any, int], float],
                   sampleSizeList: List[int], 
                   kList: List[Tuple[int, float]], 
                   BList: List[int], 
@@ -150,22 +150,22 @@ def runEvaluation(baseTrainer: BaseTrainer,
     for i in range(len(sampleSizeList)):
         for j in range(numReplicates):
             checkKiller()
-            baseObjList[i].append(evaluator(baseTrainer.loadTrainingResult(baseList[i][j])))
+            baseObjList[i].append(evaluator(baseTrainer.loadTrainingResult(baseList[i][j]), j))
             logger.info(f"Finish base evaluation for sample size {sampleSizeList[i]}, replication {j}")
 
             for ind1 in range(len(BList)):
                 for ind2 in range(len(kList)):
                     checkKiller()
-                    BAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(BAGList[i][ind1][ind2][j])))
+                    BAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(BAGList[i][ind1][ind2][j]), j))
                     logger.info(f"Finish BAG evaluation for sample size {sampleSizeList[i]}, replication {j}, B={BList[ind1]}, k={kList[ind2]}")
 
             for ind1 in range(len(B12List)):
                 for ind2 in range(len(k12List)):
                     checkKiller()
-                    ReBAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(ReBAGList[i][ind1][ind2][j])))
+                    ReBAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(ReBAGList[i][ind1][ind2][j]), j))
                     logger.info(f"Finish ReBAG evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12 = {k12List[ind2]}")
                     checkKiller()
-                    ReBAGSObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(ReBAGSList[i][ind1][ind2][j])))
+                    ReBAGSObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(ReBAGSList[i][ind1][ind2][j]), j))
                     logger.info(f"Finish ReBAG-S evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12 = {k12List[ind2]}")
     
         baseObjAvg[i] = np.mean(baseObjList[i])
@@ -334,8 +334,8 @@ def plotCDF(baseObjList: List,
 
 def pipeline(resultDir: str,
              baseTrainer: BaseTrainer, 
-             sampler: Callable[[int, np.random.Generator], NDArray],
-             evaluator: Callable[[Any], float],
+             sampler: Callable[[int, int, np.random.Generator], NDArray],
+             evaluator: Callable[[Any, int], float],
              sampleSizeList: List, 
              kList: List, 
              BList: List, 
