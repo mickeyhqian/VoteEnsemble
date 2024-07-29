@@ -27,14 +27,12 @@ if __name__ == "__main__":
     logHandler.setFormatter(formatter)
     logger.addHandler(logHandler)
 
-    d = 10
+    d = 50
     hiddenD = 100
     hiddenShapes = np.full(hiddenD, 2.01)
     hiddenMeans = np.linspace(0.5, 2, num = hiddenD)
     hiddenMultipliers = (hiddenShapes - 1) * hiddenMeans
     hiddenVars = hiddenMultipliers**2 * hiddenShapes / ((hiddenShapes - 1)**2 * (hiddenShapes - 2))
-    # meanX = rngProb.uniform(1.95, 1.98, d)
-    # meanX = np.linspace(1.95, 1.99, num = d)
     genMatrix = []
     for i in range(0, hiddenD, hiddenD // d):
         vec = np.zeros(hiddenD)
@@ -45,17 +43,9 @@ if __name__ == "__main__":
     meanVector = np.dot(hiddenMeans, genMatrix)
     b = 1.3
 
-    # def sampler(n: int) -> NDArray:
-    #     return stats.lomax.rvs(meanX / (meanX - 1), size = (n, len(meanX)), random_state = rngData) + 1
-
     def sampler(n: int, repIdx: int, rng: np.random.Generator) -> NDArray:
         hidden = stats.lomax.rvs(hiddenShapes, size = (n, hiddenD), random_state = rng) * hiddenMultipliers.reshape(1, -1)
         return np.dot(hidden, genMatrix)
-
-    # def evaluator(trainingResult: NDArray) -> float:
-    #     shapes = meanX / (meanX - 1)
-    #     variance = shapes / ((shapes-1)**2 * (shapes-2))
-    #     return np.sum(variance * trainingResult**2)
 
     def evaluator(trainingResult: NDArray, repIdx: int) -> float:
         return np.dot(trainingResult, np.dot(varMatrix, trainingResult))

@@ -33,7 +33,6 @@ if __name__ == "__main__":
     rngEval = np.random.default_rng(seed = 777)
 
     d = 50
-    # meanX = rngProb.uniform(1.1, 1.9, d)
     meanX = np.linspace(1, 100, num = d)
     noiseShape = 2.1
 
