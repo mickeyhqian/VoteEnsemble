@@ -1,9 +1,7 @@
 from BaseTrainers import BaseNN, RegressionNN
-from ExpPipeline import pipeline
 import numpy as np
 from numpy.typing import NDArray
 from multiprocessing import set_start_method
-from scipy import stats
 from uuid import uuid4
 import pickle
 import json
@@ -38,7 +36,6 @@ if __name__ == "__main__":
     rngEval = np.random.default_rng(seed = 777)
 
     d = 30
-    # meanX = rngProb.uniform(1.1, 1.9, d)
     meanX = np.linspace(1, 100, num = d)
 
     def trueMapping(x: NDArray) -> float:
@@ -110,29 +107,3 @@ if __name__ == "__main__":
         with open(dumpFileJSON, "w") as f:
             json.dump(lossData, f, indent = 4)
         logger.info(f"Finish evaluating conventional bagging for sample size = {sampleSize}, index = {index}, loss = {lossData[sampleSize][index]}")
-
-
-
-
-    # sampleSizeList = [2**i for i in range(10, 17)]
-    # kList = []
-    # BList = []
-    # k12List = [((30, 0.5), (30, 0.005))]
-    # B12List = [(50, 200)]
-    # numReplicates = 100
-
-    
-    # pipeline(resultDir,
-    #          baseNN, 
-    #          sampler, 
-    #          evaluator, 
-    #          sampleSizeList, 
-    #          kList, 
-    #          BList, 
-    #          k12List, 
-    #          B12List, 
-    #          numReplicates, 
-    #          numParallelTrain = 1, 
-    #          numParallelEval = 1,
-    #          dumpSubsampleResults = True,
-    #          runConventionalBagging = True)
