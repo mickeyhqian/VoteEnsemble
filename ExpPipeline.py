@@ -298,18 +298,18 @@ def plotCDF(baseObjList: List,
 
     for i in range(len(sampleSizeList)):
         xList, yList = getCDF(baseObjList[i])
-        ax[i].plot(xList, yList, marker = 'o', markeredgecolor = 'none', color = 'blue', linestyle = 'solid', label = 'base')
+        ax[i].plot(xList, yList, color = 'blue', linestyle = 'solid', label = 'base', linewidth = 2)
         for ind1, B in enumerate(BList):
             for ind2, k in enumerate(kList):
                 xList, yList = getCDF(BAGObjList[i][ind1][ind2])
-                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'BAG, B={B}, k={k}')
+                ax[i].plot(xList, yList, linestyle = 'solid', label = f'BAG, B={B}, k={k}', linewidth = 2)
         
         for ind1, B12 in enumerate(B12List):
             for ind2, k in enumerate(k12List):
                 xList, yList = getCDF(ReBAGObjList[i][ind1][ind2])
-                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'ReBAG, B12={B12}, k={k}')
+                ax[i].plot(xList, yList, linestyle = 'solid', label = f'ReBAG, B12={B12}, k={k}', linewidth = 2)
                 xList, yList = getCDF(ReBAGSObjList[i][ind1][ind2])
-                ax[i].plot(xList, yList, marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'ReBAG-S, B12={B12}, k={k}')
+                ax[i].plot(xList, yList, linestyle = 'solid', label = f'ReBAG-S, B12={B12}, k={k}', linewidth = 2)
         
         if i == len(sampleSizeList) - 1:
             ax[i].set_xlabel('cost')

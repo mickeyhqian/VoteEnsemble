@@ -86,7 +86,7 @@ class BaseRidge(BaseTrainer):
     
     def objective(self, trainingResult: Ridge, sample: NDArray) -> float:
         error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
-        return np.mean(error ** 2) + np.mean(trainingResult.coef_ ** 2) * self._alpha / len(sample)
+        return np.mean(error ** 2)
     
     @property
     def isMinimization(self):

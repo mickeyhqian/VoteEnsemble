@@ -28,19 +28,19 @@ if __name__ == "__main__":
     logHandler.setFormatter(formatter)
     logger.addHandler(logHandler)
 
-    d = 50
+    d = 10
     meanX = np.linspace(1, 10, num = d)
     beta = np.linspace(-10, 10, num = d)
     noiseShape = 2.1
 
-    def sampler(n: int, rng: np.random.Generator) -> NDArray:
+    def sampler(n: int, repIdx: int, rng: np.random.Generator) -> NDArray:
         XSample = rng.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
         noise: NDArray = stats.lomax.rvs(noiseShape, size = n, random_state = rng) \
             - stats.lomax.rvs(noiseShape, size = n, random_state = rng)
         YSample = np.dot(XSample, np.reshape(beta, (-1,1))) + noise.reshape(-1, 1)
         return np.hstack((YSample, XSample))
 
-    def evaluator(trainingResult: Ridge) -> float:
+    def evaluator(trainingResult: Ridge, repIdx: int) -> float:
         error = trainingResult.coef_ - beta
         XVars = (2 * meanX)**2 / 12
         return np.dot(meanX, error) ** 2 + np.sum(error**2 * XVars)

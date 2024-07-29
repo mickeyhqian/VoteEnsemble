@@ -48,7 +48,7 @@ if __name__ == "__main__":
     # def sampler(n: int) -> NDArray:
     #     return stats.lomax.rvs(meanX / (meanX - 1), size = (n, len(meanX)), random_state = rngData) + 1
 
-    def sampler(n: int, rng: np.random.Generator) -> NDArray:
+    def sampler(n: int, repIdx: int, rng: np.random.Generator) -> NDArray:
         hidden = stats.lomax.rvs(hiddenShapes, size = (n, hiddenD), random_state = rng) * hiddenMultipliers.reshape(1, -1)
         return np.dot(hidden, genMatrix)
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     #     variance = shapes / ((shapes-1)**2 * (shapes-2))
     #     return np.sum(variance * trainingResult**2)
 
-    def evaluator(trainingResult: NDArray) -> float:
+    def evaluator(trainingResult: NDArray, repIdx: int) -> float:
         return np.dot(trainingResult, np.dot(varMatrix, trainingResult))
 
     portfolio = BasePortfolio(meanVector, b)
