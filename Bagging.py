@@ -52,15 +52,15 @@ class BaseTrainer(metaclass = ABCMeta):
                 Each is a training result output by self.train.
 
         Returns:
-            True/False
+            True/False.
         """
         pass
 
     @abstractmethod
     def objective(self, trainingResult: Any, sample: NDArray) -> float:
         """
-        Evaluates the empirical objective/loss for a training result on a data set.
-        This evaluation is to be used in the voting phase of ReBAG, and may or may not be the same as the training objective/loss optimized by self.train.
+        Evaluates the empirical objective for a training result on a data set.
+        This evaluation is to be used in the voting phase of ReBAG, and may or may not be the same as the training objective optimized by self.train.
 
         Invoked in ReBAG only.
 
@@ -71,7 +71,7 @@ class BaseTrainer(metaclass = ABCMeta):
                 A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
 
         Returns:
-            The empirical objective/loss value.
+            The empirical objective value.
         """
         pass
 
@@ -79,7 +79,7 @@ class BaseTrainer(metaclass = ABCMeta):
     @abstractmethod
     def isMinimization(self):
         """
-        Property of whether or not the training objective self.objective is to be minimized (as opposed to maximized).
+        Property of whether or not the objective defined by self.objective is to be minimized (as opposed to being maximized).
 
         Invoked in ReBAG only.
         """
@@ -299,7 +299,7 @@ class BAG(BaseBagging):
                 Number of subsamples to draw.
 
         Returns:
-            A bagged training result.
+            A training result.
         """
         self._prepareSubsampleResultDir()
 
@@ -498,7 +498,7 @@ class ReBAG(BaseBagging):
                 The probability threshold guiding the auto-selection of epsilon. Default 0.5.
 
         Returns:
-            A bagged training result.
+            A training result.
         """
         sample = np.asarray(sample)
         sample1 = sample
