@@ -59,7 +59,7 @@ class BaseTrainer(metaclass = ABCMeta):
     @abstractmethod
     def objective(self, trainingResult: Any, sample: NDArray) -> float:
         """
-        Evaluates the training objective for a training result on a data set.
+        Evaluates the empirical objective/loss for a training result on a data set.
         This evaluation is to be used in the voting phase of ReBAG, and may or may not be the same as the training objective optimized by self.train.
 
         Invoked in ReBAG only.
@@ -71,7 +71,7 @@ class BaseTrainer(metaclass = ABCMeta):
                 A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
 
         Returns:
-            The training objective value.
+            The empirical objective/loss value.
         """
         pass
 
