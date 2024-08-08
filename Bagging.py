@@ -60,7 +60,7 @@ class BaseTrainer(metaclass = ABCMeta):
     def objective(self, trainingResult: Any, sample: NDArray) -> float:
         """
         Evaluates the empirical objective/loss for a training result on a data set.
-        This evaluation is to be used in the voting phase of ReBAG, and may or may not be the same as the training objective optimized by self.train.
+        This evaluation is to be used in the voting phase of ReBAG, and may or may not be the same as the training objective/loss optimized by self.train.
 
         Invoked in ReBAG only.
 
