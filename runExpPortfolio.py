@@ -1,4 +1,4 @@
-from BaseTrainers import BasePortfolio
+from BaseLearners import BasePortfolio
 from ExpPipeline import pipeline
 import numpy as np
 from numpy.typing import NDArray
@@ -8,7 +8,7 @@ from uuid import uuid4
 import sys
 import os
 import logging
-logger = logging.getLogger(name = "Bagging")
+logger = logging.getLogger(name = "VE")
 
 
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     logHandler.setFormatter(formatter)
     logger.addHandler(logHandler)
 
-    d = 50
+    d = 10
     hiddenD = 100
     hiddenShapes = np.full(hiddenD, 2.01)
     hiddenMeans = np.linspace(0.5, 2, num = hiddenD)
@@ -47,8 +47,8 @@ if __name__ == "__main__":
         hidden = stats.lomax.rvs(hiddenShapes, size = (n, hiddenD), random_state = rng) * hiddenMultipliers.reshape(1, -1)
         return np.dot(hidden, genMatrix)
 
-    def evaluator(trainingResult: NDArray, repIdx: int) -> float:
-        return np.dot(trainingResult, np.dot(varMatrix, trainingResult))
+    def evaluator(learningResult: NDArray, repIdx: int) -> float:
+        return np.dot(learningResult, np.dot(varMatrix, learningResult))
 
     portfolio = BasePortfolio(meanVector, b)
 
@@ -69,5 +69,5 @@ if __name__ == "__main__":
              k12List, 
              B12List, 
              numReplicates, 
-             numParallelTrain = 1, 
+             numParallelLearn = 1, 
              numParallelEval = 1)

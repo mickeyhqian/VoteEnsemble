@@ -1,5 +1,5 @@
 import signal
-from Bagging import BaseTrainer, BAG, ReBAG
+from VoteEnsemble import BaseLearner, MoVE, ROVE
 import numpy as np
 from numpy.typing import NDArray
 import pickle
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import os
 from typing import List, Tuple, Callable, Any, Union
 import logging
-logger = logging.getLogger(name = "Bagging")
+logger = logging.getLogger(name = "VE")
 
 
 
@@ -36,7 +36,7 @@ def checkKiller():
         raise KilledByUser()
 
 
-def runTraining(baseTrainer: BaseTrainer, 
+def runTraining(baseLearner: BaseLearner, 
                 sampler: Callable[[int, int, np.random.Generator], NDArray],
                 sampleSizeList: List[int], 
                 kList: List[Tuple[int, float]], 
@@ -45,14 +45,14 @@ def runTraining(baseTrainer: BaseTrainer,
                 B12List: List[Tuple[int, int]], 
                 numReplicates: int,
                 resultDir: str,
-                numParallelTrain: int = 1,
+                numParallelLearn: int = 1,
                 numParallelEval: int = 1,
                 subsampleResultsDir: Union[str, None] = None,
                 runConventionalBagging: bool = False):
     baseList = [[] for _ in range(len(sampleSizeList))]
-    BAGList = [[[[] for _ in range(len(kList))] for _ in range(len(BList))] for _ in range(len(sampleSizeList))]
-    ReBAGList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
-    ReBAGSList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
+    MoVEList = [[[[] for _ in range(len(kList))] for _ in range(len(BList))] for _ in range(len(sampleSizeList))]
+    ROVEList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
+    ROVEsList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
     os.makedirs(resultDir, exist_ok = True)
 
     for i in range(len(sampleSizeList)):
@@ -64,25 +64,24 @@ def runTraining(baseTrainer: BaseTrainer,
             checkKiller()
             resultFile = os.path.join(resultDir, f"base_{n}_{j}")
             if not os.path.isfile(resultFile):
-                trainResult = baseTrainer.train(sample)
-                if trainResult is None:
-                    raise RuntimeError(f"base training failed for sample size {n}, replication {j}")
-                baseTrainer.dumpTrainingResult(trainResult, resultFile)
+                learningResult = baseLearner.learn(sample)
+                if learningResult is None:
+                    raise RuntimeError(f"base learning failed for sample size {n}, replication {j}")
+                baseLearner.dumpLearningResult(learningResult, resultFile)
             baseList[i].append(resultFile)
-            logger.info(f"Finish base training for sample size {n}, replication {j}")
+            logger.info(f"Finish base learning for sample size {n}, replication {j}")
 
             for ind1, B in enumerate(BList):
                 for ind2, (base, ratio) in enumerate(kList):
                     k = max(base, int(n * ratio))
-                    bag = BAG(baseTrainer, numParallelTrain = numParallelTrain, randomState = 666, subsampleResultsDir = subsampleResultsDir)
+                    move = MoVE(baseLearner, numParallelLearn = numParallelLearn, randomState = 666, subsampleResultsDir = subsampleResultsDir)
 
                     checkKiller()
-                    resultFile = os.path.join(resultDir, f"BAG_{n}_{j}_{B}_{k}")
+                    resultFile = os.path.join(resultDir, f"{MoVE.__name__}_{n}_{j}_{B}_{k}")
                     if not os.path.isfile(resultFile):
-                        trainResult = bag.run(sample, k, B)
-                        baseTrainer.dumpTrainingResult(trainResult, resultFile)
-                    BAGList[i][ind1][ind2].append(resultFile)
-                    logger.info(f"Finish BAG training for sample size {n}, replication {j}, B={B}, k={k}")
+                        baseLearner.dumpLearningResult(move.run(sample, k, B), resultFile)
+                    MoVEList[i][ind1][ind2].append(resultFile)
+                    logger.info(f"Finish {MoVE.__name__} learning for sample size {n}, replication {j}, B={B}, k={k}")
 
             caseSet = set()
             for ind1, (B1, B2) in enumerate(B12List):
@@ -91,42 +90,40 @@ def runTraining(baseTrainer: BaseTrainer,
                     k2 = max(base2, int(n * ratio2))
                     deleteSubsampleResults = not runConventionalBagging or (B1, k1) in caseSet
                     if deleteSubsampleResults:
-                        rebagSubsampleResultsDir = subsampleResultsDir
+                        ROVESubsampleResultsDir = subsampleResultsDir
                     else:
                         caseSet.add((B1, k1))
-                        rebagSubsampleResultsDir = os.path.join(subsampleResultsDir, f"ReBAGResults_{n}_{j}_{B1}_{k1}")
-                    rebag = ReBAG(baseTrainer, False, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666, subsampleResultsDir = rebagSubsampleResultsDir, deleteSubsampleResults = deleteSubsampleResults)
+                        ROVESubsampleResultsDir = os.path.join(subsampleResultsDir, f"{ROVE.__name__}Results_{n}_{j}_{B1}_{k1}")
+                    rove = ROVE(baseLearner, False, numParallelEval = numParallelEval, numParallelLearn = numParallelLearn, randomState = 666, subsampleResultsDir = ROVESubsampleResultsDir, deleteSubsampleResults = deleteSubsampleResults)
                     
                     checkKiller()
-                    resultFile = os.path.join(resultDir, f"ReBAG_{n}_{j}_{B1}_{B2}_{k1}_{k2}")
+                    resultFile = os.path.join(resultDir, f"{ROVE.__name__}_{n}_{j}_{B1}_{B2}_{k1}_{k2}")
                     if not os.path.isfile(resultFile):
-                        trainResult = rebag.run(sample, k1, k2, B1, B2)
-                        baseTrainer.dumpTrainingResult(trainResult, resultFile)
-                    ReBAGList[i][ind1][ind2].append(resultFile)
-                    logger.info(f"Finish ReBAG training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}")
+                        baseLearner.dumpLearningResult(rove.run(sample, k1, k2, B1, B2), resultFile)
+                    ROVEList[i][ind1][ind2].append(resultFile)
+                    logger.info(f"Finish {ROVE.__name__} learning for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2={k2}")
 
             for ind1, (B1, B2) in enumerate(B12List):
                 for ind2, ((base1, ratio1), (base2, ratio2)) in enumerate(k12List):
                     k1 = max(base1, int(n / 2 * ratio1))
                     k2 = max(base2, int(n / 2 * ratio2))
-                    rebags = ReBAG(baseTrainer, True, numParallelEval = numParallelEval, numParallelTrain = numParallelTrain, randomState = 666, subsampleResultsDir = subsampleResultsDir)
+                    roves = ROVE(baseLearner, True, numParallelEval = numParallelEval, numParallelLearn = numParallelLearn, randomState = 666, subsampleResultsDir = subsampleResultsDir)
 
                     checkKiller()
-                    resultFile = os.path.join(resultDir, f"ReBAG-S_{n}_{j}_{B1}_{B2}_{k1}_{k2}")
+                    resultFile = os.path.join(resultDir, f"{ROVE.__name__}s_{n}_{j}_{B1}_{B2}_{k1}_{k2}")
                     if not os.path.isfile(resultFile):
-                        trainResult = rebags.run(sample, k1, k2, B1, B2)
-                        baseTrainer.dumpTrainingResult(trainResult, resultFile)
-                    ReBAGSList[i][ind1][ind2].append(resultFile)
-                    logger.info(f"Finish ReBAG-S training for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2 = {k2}")
+                        baseLearner.dumpLearningResult(roves.run(sample, k1, k2, B1, B2), resultFile)
+                    ROVEsList[i][ind1][ind2].append(resultFile)
+                    logger.info(f"Finish {ROVE.__name__}s learning for sample size {n}, replication {j}, B1={B1}, B2={B2}, k1={k1}, k2={k2}")
 
-    return baseList, BAGList, ReBAGList, ReBAGSList
+    return baseList, MoVEList, ROVEList, ROVEsList
 
 
-def runEvaluation(baseTrainer: BaseTrainer, 
+def runEvaluation(baseLearner: BaseLearner, 
                   baseList: List, 
-                  BAGList: List, 
-                  ReBAGList: List, 
-                  ReBAGSList: List, 
+                  MoVEList: List, 
+                  ROVEList: List, 
+                  ROVEsList: List, 
                   evaluator: Callable[[Any, int], float],
                   sampleSizeList: List[int], 
                   kList: List[Tuple[int, float]], 
@@ -140,54 +137,54 @@ def runEvaluation(baseTrainer: BaseTrainer,
     
     baseObjList = [[] for _ in range(len(sampleSizeList))]
     baseObjAvg = [None for _ in range(len(sampleSizeList))]
-    BAGObjList = [[[[] for _ in range(len(kList))] for _ in range(len(BList))] for _ in range(len(sampleSizeList))]
-    BAGObjAvg = [[[None for _ in range(len(kList))] for _ in range(len(BList))] for _ in range(len(sampleSizeList))]
-    ReBAGObjList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
-    ReBAGObjAvg = [[[None for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
-    ReBAGSObjList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
-    ReBAGSObjAvg = [[[None for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
+    MoVEObjList = [[[[] for _ in range(len(kList))] for _ in range(len(BList))] for _ in range(len(sampleSizeList))]
+    MoVEObjAvg = [[[None for _ in range(len(kList))] for _ in range(len(BList))] for _ in range(len(sampleSizeList))]
+    ROVEObjList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
+    ROVEObjAvg = [[[None for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
+    ROVEsObjList = [[[[] for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
+    ROVEsObjAvg = [[[None for _ in range(len(k12List))] for _ in range(len(B12List))] for _ in range(len(sampleSizeList))]
 
     for i in range(len(sampleSizeList)):
         for j in range(numReplicates):
             checkKiller()
-            baseObjList[i].append(evaluator(baseTrainer.loadTrainingResult(baseList[i][j]), j))
+            baseObjList[i].append(evaluator(baseLearner.loadLearningResult(baseList[i][j]), j))
             logger.info(f"Finish base evaluation for sample size {sampleSizeList[i]}, replication {j}")
 
             for ind1 in range(len(BList)):
                 for ind2 in range(len(kList)):
                     checkKiller()
-                    BAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(BAGList[i][ind1][ind2][j]), j))
-                    logger.info(f"Finish BAG evaluation for sample size {sampleSizeList[i]}, replication {j}, B={BList[ind1]}, k={kList[ind2]}")
+                    MoVEObjList[i][ind1][ind2].append(evaluator(baseLearner.loadLearningResult(MoVEList[i][ind1][ind2][j]), j))
+                    logger.info(f"Finish {MoVE.__name__} evaluation for sample size {sampleSizeList[i]}, replication {j}, B={BList[ind1]}, k={kList[ind2]}")
 
             for ind1 in range(len(B12List)):
                 for ind2 in range(len(k12List)):
                     checkKiller()
-                    ReBAGObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(ReBAGList[i][ind1][ind2][j]), j))
-                    logger.info(f"Finish ReBAG evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12 = {k12List[ind2]}")
+                    ROVEObjList[i][ind1][ind2].append(evaluator(baseLearner.loadLearningResult(ROVEList[i][ind1][ind2][j]), j))
+                    logger.info(f"Finish {ROVE.__name__} evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12={k12List[ind2]}")
                     checkKiller()
-                    ReBAGSObjList[i][ind1][ind2].append(evaluator(baseTrainer.loadTrainingResult(ReBAGSList[i][ind1][ind2][j]), j))
-                    logger.info(f"Finish ReBAG-S evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12 = {k12List[ind2]}")
+                    ROVEsObjList[i][ind1][ind2].append(evaluator(baseLearner.loadLearningResult(ROVEsList[i][ind1][ind2][j]), j))
+                    logger.info(f"Finish {ROVE.__name__}s evaluation for sample size {sampleSizeList[i]}, replication {j}, B12={B12List[ind1]}, k12={k12List[ind2]}")
     
         baseObjAvg[i] = np.mean(baseObjList[i])
         for ind1 in range(len(BList)):
             for ind2 in range(len(kList)):
-                BAGObjAvg[i][ind1][ind2] = np.mean(BAGObjList[i][ind1][ind2])
+                MoVEObjAvg[i][ind1][ind2] = np.mean(MoVEObjList[i][ind1][ind2])
         for ind1 in range(len(B12List)):
             for ind2 in range(len(k12List)):
-                ReBAGObjAvg[i][ind1][ind2] = np.mean(ReBAGObjList[i][ind1][ind2])
-                ReBAGSObjAvg[i][ind1][ind2] = np.mean(ReBAGSObjList[i][ind1][ind2])
+                ROVEObjAvg[i][ind1][ind2] = np.mean(ROVEObjList[i][ind1][ind2])
+                ROVEsObjAvg[i][ind1][ind2] = np.mean(ROVEsObjList[i][ind1][ind2])
 
-    return baseObjList, BAGObjList, ReBAGObjList, ReBAGSObjList, baseObjAvg, BAGObjAvg, ReBAGObjAvg, ReBAGSObjAvg
+    return baseObjList, MoVEObjList, ROVEObjList, ROVEsObjList, baseObjAvg, MoVEObjAvg, ROVEObjAvg, ROVEsObjAvg
 
 
 def dumpEvalResults(baseObjList: List, 
-                    BAGObjList: List, 
-                    ReBAGObjList: List, 
-                    ReBAGSObjList: List, 
+                    MoVEObjList: List, 
+                    ROVEObjList: List, 
+                    ROVEsObjList: List, 
                     baseObjAvg: List, 
-                    BAGObjAvg: List, 
-                    ReBAGObjAvg: List, 
-                    ReBAGSObjAvg: List,
+                    MoVEObjAvg: List, 
+                    ROVEObjAvg: List, 
+                    ROVEsObjAvg: List,
                     sampleSizeList: List[int], 
                     kList: List[Tuple[int, float]], 
                     BList: List[int], 
@@ -199,13 +196,13 @@ def dumpEvalResults(baseObjList: List,
     with open(filePath, "wb") as f:
         pickle.dump((
             baseObjList, 
-            BAGObjList, 
-            ReBAGObjList, 
-            ReBAGSObjList, 
+            MoVEObjList, 
+            ROVEObjList, 
+            ROVEsObjList, 
             baseObjAvg, 
-            BAGObjAvg, 
-            ReBAGObjAvg, 
-            ReBAGSObjAvg,
+            MoVEObjAvg, 
+            ROVEObjAvg, 
+            ROVEsObjAvg,
             sampleSizeList, 
             kList, 
             BList, 
@@ -222,9 +219,9 @@ def loadResults(filePath: str):
 
 
 def plotAverage(baseObjAvg: List, 
-                BAGObjAvg: List, 
-                ReBAGObjAvg: List, 
-                ReBAGSObjAvg: List, 
+                MoVEObjAvg: List, 
+                ROVEObjAvg: List, 
+                ROVEsObjAvg: List, 
                 sampleSizeList: List, 
                 kList: List, 
                 BList: List, 
@@ -238,12 +235,12 @@ def plotAverage(baseObjAvg: List,
 
     for ind1, B in enumerate(BList):
         for ind2, k in enumerate(kList):
-            ax.plot(sampleSizeList, [BAGObjAvg[i][ind1][ind2] for i in range(len(sampleSizeList))], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'BAG, B={B}, k={k}')
+            ax.plot(sampleSizeList, [MoVEObjAvg[i][ind1][ind2] for i in range(len(sampleSizeList))], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'{MoVE.__name__}, B={B}, k={k}')
     
     for ind1, B12 in enumerate(B12List):
         for ind2, k in enumerate(k12List):
-            ax.plot(sampleSizeList, [ReBAGObjAvg[i][ind1][ind2] for i in range(len(sampleSizeList))], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'ReBAG, B12={B12}, k={k}')
-            ax.plot(sampleSizeList, [ReBAGSObjAvg[i][ind1][ind2] for i in range(len(sampleSizeList))], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'ReBAG-S, B12={B12}, k={k}')
+            ax.plot(sampleSizeList, [ROVEObjAvg[i][ind1][ind2] for i in range(len(sampleSizeList))], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'{ROVE.__name__}, B12={B12}, k12={k}')
+            ax.plot(sampleSizeList, [ROVEsObjAvg[i][ind1][ind2] for i in range(len(sampleSizeList))], marker = 's', markeredgecolor = 'none', linestyle = 'solid', label = f'{ROVE.__name__}s, B12={B12}, k12={k}')
     
     ax.set_xlabel('sample size', size = 20)
     ax.set_ylabel('cost', size = 20)
@@ -259,9 +256,9 @@ def plotAverage(baseObjAvg: List,
 
 
 def plotCDF(baseObjList: List, 
-            BAGObjList: List, 
-            ReBAGObjList: List, 
-            ReBAGSObjList: List, 
+            MoVEObjList: List, 
+            ROVEObjList: List, 
+            ROVEsObjList: List, 
             sampleSizeList: List, 
             kList: List, 
             BList: List, 
@@ -301,15 +298,15 @@ def plotCDF(baseObjList: List,
         ax[i].plot(xList, yList, color = 'blue', linestyle = 'solid', label = 'base', linewidth = 2)
         for ind1, B in enumerate(BList):
             for ind2, k in enumerate(kList):
-                xList, yList = getCDF(BAGObjList[i][ind1][ind2])
-                ax[i].plot(xList, yList, linestyle = 'solid', label = f'BAG, B={B}, k={k}', linewidth = 2)
+                xList, yList = getCDF(MoVEObjList[i][ind1][ind2])
+                ax[i].plot(xList, yList, linestyle = 'solid', label = f'{MoVE.__name__}, B={B}, k={k}', linewidth = 2)
         
         for ind1, B12 in enumerate(B12List):
             for ind2, k in enumerate(k12List):
-                xList, yList = getCDF(ReBAGObjList[i][ind1][ind2])
-                ax[i].plot(xList, yList, linestyle = 'solid', label = f'ReBAG, B12={B12}, k={k}', linewidth = 2)
-                xList, yList = getCDF(ReBAGSObjList[i][ind1][ind2])
-                ax[i].plot(xList, yList, linestyle = 'solid', label = f'ReBAG-S, B12={B12}, k={k}', linewidth = 2)
+                xList, yList = getCDF(ROVEObjList[i][ind1][ind2])
+                ax[i].plot(xList, yList, linestyle = 'solid', label = f'{ROVE.__name__}, B12={B12}, k12={k}', linewidth = 2)
+                xList, yList = getCDF(ROVEsObjList[i][ind1][ind2])
+                ax[i].plot(xList, yList, linestyle = 'solid', label = f'{ROVE.__name__}s, B12={B12}, k12={k}', linewidth = 2)
         
         if i == len(sampleSizeList) - 1:
             ax[i].set_xlabel('cost')
@@ -333,7 +330,7 @@ def plotCDF(baseObjList: List,
 
 
 def pipeline(resultDir: str,
-             baseTrainer: BaseTrainer, 
+             baseLearner: BaseLearner, 
              sampler: Callable[[int, int, np.random.Generator], NDArray],
              evaluator: Callable[[Any, int], float],
              sampleSizeList: List, 
@@ -342,28 +339,28 @@ def pipeline(resultDir: str,
              k12List: List, 
              B12List: List, 
              numReplicates: int,
-             numParallelTrain: int = 1,
+             numParallelLearn: int = 1,
              numParallelEval: int = 1,
              dumpSubsampleResults: bool = False,
              runConventionalBagging: bool = False):
 
     baseList = [] 
-    BAGList = []
-    ReBAGList = []
-    ReBAGSList = []
-    trainingResultDir = os.path.join(resultDir, "trainingResults")
+    MoVEList = []
+    ROVEList = []
+    ROVEsList = []
+    learningResultDir = os.path.join(resultDir, "learningResults")
     subsampleResultsDir = None
     if dumpSubsampleResults:
         subsampleResultsDir = os.path.join(resultDir, "subsampleResults")
 
     baseObjList = []
-    BAGObjList = []
-    ReBAGObjList = []
-    ReBAGSObjList = []
+    MoVEObjList = []
+    ROVEObjList = []
+    ROVEsObjList = []
     baseObjAvg = []
-    BAGObjAvg = []
-    ReBAGObjAvg = []
-    ReBAGSObjAvg = []
+    MoVEObjAvg = []
+    ROVEObjAvg = []
+    ROVEsObjAvg = []
     evalResultFile = os.path.join(resultDir, "evalResults.pkl")
 
     sampleSizeFinished = []
@@ -377,57 +374,57 @@ def pipeline(resultDir: str,
         for sampleSize in sampleSizeList:
             checkKiller()
 
-            baseListNew, BAGListNew, ReBAGListNew, ReBAGSListNew = runTraining(baseTrainer, 
-                                                                               sampler,
-                                                                               [sampleSize], 
-                                                                               kList, 
-                                                                               BList, 
-                                                                               k12List, 
-                                                                               B12List, 
-                                                                               numReplicates,
-                                                                               trainingResultDir,
-                                                                               numParallelTrain = numParallelTrain,
-                                                                               numParallelEval = numParallelEval,
-                                                                               subsampleResultsDir = subsampleResultsDir,
-                                                                               runConventionalBagging = runConventionalBagging)
+            baseListNew, MoVEListNew, ROVEListNew, ROVEsListNew = runTraining(baseLearner, 
+                                                                              sampler,
+                                                                              [sampleSize], 
+                                                                              kList, 
+                                                                              BList, 
+                                                                              k12List, 
+                                                                              B12List, 
+                                                                              numReplicates,
+                                                                              learningResultDir,
+                                                                              numParallelLearn = numParallelLearn,
+                                                                              numParallelEval = numParallelEval,
+                                                                              subsampleResultsDir = subsampleResultsDir,
+                                                                              runConventionalBagging = runConventionalBagging)
 
             baseList.extend(baseListNew)
-            BAGList.extend(BAGListNew)
-            ReBAGList.extend(ReBAGListNew)
-            ReBAGSList.extend(ReBAGSListNew)
+            MoVEList.extend(MoVEListNew)
+            ROVEList.extend(ROVEListNew)
+            ROVEsList.extend(ROVEsListNew)
 
-            baseObjListNew, BAGObjListNew, ReBAGObjListNew, ReBAGSObjListNew, baseObjAvgNew, BAGObjAvgNew, ReBAGObjAvgNew, ReBAGSObjAvgNew = runEvaluation(baseTrainer,
-                                                                                                                                                           baseListNew, 
-                                                                                                                                                           BAGListNew, 
-                                                                                                                                                           ReBAGListNew, 
-                                                                                                                                                           ReBAGSListNew, 
-                                                                                                                                                           evaluator,
-                                                                                                                                                           [sampleSize], 
-                                                                                                                                                           kList, 
-                                                                                                                                                           BList, 
-                                                                                                                                                           k12List, 
-                                                                                                                                                           B12List,
-                                                                                                                                                           numReplicates)
+            baseObjListNew, MoVEObjListNew, ROVEObjListNew, ROVEsObjListNew, baseObjAvgNew, MoVEObjAvgNew, ROVEObjAvgNew, ROVEsObjAvgNew = runEvaluation(baseLearner,
+                                                                                                                                                         baseListNew, 
+                                                                                                                                                         MoVEListNew, 
+                                                                                                                                                         ROVEListNew, 
+                                                                                                                                                         ROVEsListNew, 
+                                                                                                                                                         evaluator,
+                                                                                                                                                         [sampleSize], 
+                                                                                                                                                         kList, 
+                                                                                                                                                         BList, 
+                                                                                                                                                         k12List, 
+                                                                                                                                                         B12List,
+                                                                                                                                                         numReplicates)
             
             baseObjList.extend(baseObjListNew)
-            BAGObjList.extend(BAGObjListNew)
-            ReBAGObjList.extend(ReBAGObjListNew)
-            ReBAGSObjList.extend(ReBAGSObjListNew)
+            MoVEObjList.extend(MoVEObjListNew)
+            ROVEObjList.extend(ROVEObjListNew)
+            ROVEsObjList.extend(ROVEsObjListNew)
             baseObjAvg.extend(baseObjAvgNew)
-            BAGObjAvg.extend(BAGObjAvgNew)
-            ReBAGObjAvg.extend(ReBAGObjAvgNew)
-            ReBAGSObjAvg.extend(ReBAGSObjAvgNew)
+            MoVEObjAvg.extend(MoVEObjAvgNew)
+            ROVEObjAvg.extend(ROVEObjAvgNew)
+            ROVEsObjAvg.extend(ROVEsObjAvgNew)
 
             sampleSizeFinished.append(sampleSize)
             
             dumpEvalResults(baseObjList, 
-                            BAGObjList, 
-                            ReBAGObjList, 
-                            ReBAGSObjList, 
+                            MoVEObjList, 
+                            ROVEObjList, 
+                            ROVEsObjList, 
                             baseObjAvg, 
-                            BAGObjAvg, 
-                            ReBAGObjAvg, 
-                            ReBAGSObjAvg,
+                            MoVEObjAvg, 
+                            ROVEObjAvg, 
+                            ROVEsObjAvg,
                             sampleSizeFinished, 
                             kList, 
                             BList, 
@@ -437,9 +434,9 @@ def pipeline(resultDir: str,
                             evalResultFile)
             
             plotAverage(baseObjAvg, 
-                        BAGObjAvg, 
-                        ReBAGObjAvg, 
-                        ReBAGSObjAvg,
+                        MoVEObjAvg, 
+                        ROVEObjAvg, 
+                        ROVEsObjAvg,
                         sampleSizeFinished, 
                         kList, 
                         BList, 
@@ -448,9 +445,9 @@ def pipeline(resultDir: str,
                         avgFigPath)
             
             plotCDF(baseObjList, 
-                    BAGObjList, 
-                    ReBAGObjList, 
-                    ReBAGSObjList, 
+                    MoVEObjList, 
+                    ROVEObjList, 
+                    ROVEsObjList, 
                     sampleSizeFinished, 
                     kList, 
                     BList, 

@@ -1,4 +1,4 @@
-from BaseTrainers import BaseNN, RegressionNN
+from BaseLearners import BaseNN, RegressionNN
 import numpy as np
 from numpy.typing import NDArray
 from multiprocessing import set_start_method
@@ -9,7 +9,7 @@ import sys
 import os
 import torch
 import logging
-logger = logging.getLogger(name = "Bagging")
+logger = logging.getLogger(name = "VE")
 
 
 
@@ -54,8 +54,8 @@ if __name__ == "__main__":
     evalSample = evalSampler(1000000)
     evalDevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def inference(trainingResult: RegressionNN) -> torch.Tensor:
-        return baseNN.inference(trainingResult, evalSample, device = evalDevice)
+    def inference(learningResult: RegressionNN) -> torch.Tensor:
+        return baseNN.inference(learningResult, evalSample, device = evalDevice)
 
     modelDir = os.path.join(resultDir, "subsampleResults")
     if not os.path.isdir(modelDir):
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             subsampleIndex = getSubsampleIndex(modelFile)
             modelPath = os.path.join(dirPath, modelFile)
 
-            model = baseNN.loadTrainingResult(modelPath)
+            model = baseNN.loadLearningResult(modelPath)
             prediction = inference(model)
             bagPrediction += prediction
 

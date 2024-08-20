@@ -1,4 +1,4 @@
-from Bagging import BaseTrainer
+from VoteEnsemble import BaseLearner
 from sklearn.linear_model import LinearRegression, Ridge
 import numpy as np
 from numpy.typing import NDArray
@@ -11,14 +11,14 @@ from typing import List, Union
 
     
 
-class BaseLP(BaseTrainer):
+class BaseLP(BaseLearner):
     def __init__(self, A: NDArray, b: NDArray, lb: NDArray, ub: NDArray):
         self._A: NDArray = np.asarray(A)
         self._b: NDArray = np.asarray(b)
         self._lb: NDArray = np.asarray(lb)
         self._ub: NDArray = np.asarray(ub)
     
-    def train(self, sample: NDArray) -> NDArray:
+    def learn(self, sample: NDArray) -> NDArray:
         x = cp.Variable(len(self._lb))
         prob = cp.Problem(cp.Minimize(np.mean(sample, axis = 0) @ x),
                           [self._A @ x <= self._b, x >= self._lb, x <= self._ub])
@@ -34,16 +34,16 @@ class BaseLP(BaseTrainer):
     def isDuplicate(self, result1: NDArray, result2: NDArray) -> bool:
         return np.max(np.abs(result1 - result2)) < 1e-6
 
-    def objective(self, trainingResult: NDArray, sample: NDArray) -> float:
-        return np.dot(np.mean(sample, axis = 0), trainingResult)
+    def objective(self, learningResult: NDArray, sample: NDArray) -> float:
+        return np.dot(np.mean(sample, axis = 0), learningResult)
 
     @property
     def isMinimization(self):
         return True
 
 
-class BaseLR(BaseTrainer):
-    def train(self, sample: NDArray) -> LinearRegression:
+class BaseLR(BaseLearner):
+    def learn(self, sample: NDArray) -> LinearRegression:
         y = sample[:,0]
         X = sample[:,1:]
         lr = LinearRegression(fit_intercept = False)
@@ -57,8 +57,8 @@ class BaseLR(BaseTrainer):
     def isDuplicate(self):
         pass
     
-    def objective(self, trainingResult: LinearRegression, sample: NDArray) -> float:
-        error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
+    def objective(self, learningResult: LinearRegression, sample: NDArray) -> float:
+        error = learningResult.predict(sample[:, 1:]) - sample[:, 0]
         return np.mean(error ** 2)
 
     @property
@@ -66,11 +66,11 @@ class BaseLR(BaseTrainer):
         return True
     
 
-class BaseRidge(BaseTrainer):
+class BaseRidge(BaseLearner):
     def __init__(self, alpha: float):
         self._alpha: float = alpha
 
-    def train(self, sample: NDArray) -> Ridge:
+    def learn(self, sample: NDArray) -> Ridge:
         y = sample[:,0]
         X = sample[:,1:]
         lr = Ridge(alpha = self._alpha, fit_intercept = False, random_state = 666)
@@ -84,8 +84,8 @@ class BaseRidge(BaseTrainer):
     def isDuplicate(self):
         pass
     
-    def objective(self, trainingResult: Ridge, sample: NDArray) -> float:
-        error = trainingResult.predict(sample[:, 1:]) - sample[:, 0]
+    def objective(self, learningResult: Ridge, sample: NDArray) -> float:
+        error = learningResult.predict(sample[:, 1:]) - sample[:, 0]
         return np.mean(error ** 2)
     
     @property
@@ -93,12 +93,12 @@ class BaseRidge(BaseTrainer):
         return True
 
 
-class BasePortfolio(BaseTrainer):
+class BasePortfolio(BaseLearner):
     def __init__(self, mu: NDArray, b: float):
         self._mu: NDArray = mu
         self._b: float = b
 
-    def train(self, sample: NDArray) -> NDArray:
+    def learn(self, sample: NDArray) -> NDArray:
         k, m = sample.shape
         sampleCentered = sample - self._mu.reshape(1, -1)
         covMatrix = np.dot(sampleCentered.T, sampleCentered) / k
@@ -121,10 +121,10 @@ class BasePortfolio(BaseTrainer):
     def isDuplicate(self):
         pass
 
-    def objective(self, trainingResult: NDArray, sample: NDArray) -> float:
+    def objective(self, learningResult: NDArray, sample: NDArray) -> float:
         sampleCentered = sample - self._mu.reshape(1, -1)
         covMatrix = np.dot(sampleCentered.T, sampleCentered) / len(sample)
-        return np.dot(np.dot(covMatrix, trainingResult), trainingResult)
+        return np.dot(np.dot(covMatrix, learningResult), learningResult)
 
     @property
     def isMinimization(self):
@@ -148,7 +148,7 @@ class RegressionNN(nn.Module):
         return self.layers(x)
 
 
-class BaseNN(BaseTrainer):
+class BaseNN(BaseLearner):
     def __init__(self, layerSizes: List[int], batchSize: int = 64, minEpochs: int = 10, maxEpochs: int = 30, learningRate: float = 1e-3, useGPU: bool = False):
         self._layerSizes: List[int] = layerSizes
         self._batchSize: int = batchSize
@@ -158,20 +158,20 @@ class BaseNN(BaseTrainer):
         self._device: torch.device = torch.device("cuda" if useGPU and torch.cuda.is_available() else "cpu")
         self._cpu: torch.device = torch.device("cpu")
 
-    def _evaluate(self, trainingResult: RegressionNN, dataloader: DataLoader, device: torch.device) -> float:
-        trainingResult.eval()
+    def _evaluate(self, learningResult: RegressionNN, dataloader: DataLoader, device: torch.device) -> float:
+        learningResult.eval()
         criterion = nn.MSELoss(reduction = "sum")
         totalLoss = 0.0
         with torch.no_grad():
             for inputs, targets in dataloader:
                 inputs = inputs.to(device)
                 targets = targets.to(device)
-                outputs = trainingResult(inputs)
+                outputs = learningResult(inputs)
                 totalLoss += criterion(outputs, targets).item()
 
         return totalLoss / len(dataloader.dataset)
 
-    def train(self, sample: NDArray) -> RegressionNN:
+    def learn(self, sample: NDArray) -> RegressionNN:
         torch.manual_seed(1109)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
@@ -241,20 +241,20 @@ class BaseNN(BaseTrainer):
     def isDuplicate(self):
         pass
 
-    def objective(self, trainingResult: RegressionNN, sample: NDArray, device: Union[torch.device, None] = None) -> float:
+    def objective(self, learningResult: RegressionNN, sample: NDArray, device: Union[torch.device, None] = None) -> float:
         if device is None:
             device = self._device
 
-        trainingResult.to(device)
+        learningResult.to(device)
 
         tensorX = torch.Tensor(sample[:, 1:])
         tensorY = torch.Tensor(sample[:, :1])
         dataset = TensorDataset(tensorX, tensorY)  # Create dataset
         dataloader = DataLoader(dataset, batch_size = 131072, shuffle = False)  # Create DataLoader
 
-        obj = self._evaluate(trainingResult, dataloader, device)
+        obj = self._evaluate(learningResult, dataloader, device)
 
-        trainingResult.to(self._cpu)
+        learningResult.to(self._cpu)
         if device.type == "cuda":
             torch.cuda.empty_cache()
         return obj
@@ -263,26 +263,26 @@ class BaseNN(BaseTrainer):
     def isMinimization(self):
         return True
     
-    def inference(self, trainingResult: RegressionNN, sample: NDArray, device: Union[torch.device, None] = None) -> torch.Tensor:
+    def inference(self, learningResult: RegressionNN, sample: NDArray, device: Union[torch.device, None] = None) -> torch.Tensor:
         if device is None:
             device = self._device
 
-        trainingResult.to(device)
+        learningResult.to(device)
 
         tensorX = torch.Tensor(sample[:, 1:])
         dataset = TensorDataset(tensorX)  # Create dataset
         dataloader = DataLoader(dataset, batch_size = 131072, shuffle = False)  # Create DataLoader
 
-        trainingResult.eval()
+        learningResult.eval()
 
         YPred = []
         with torch.no_grad():
             for inputs in dataloader:
                 inputs = inputs[0].to(device)
-                outputs = trainingResult(inputs)
+                outputs = learningResult(inputs)
                 YPred.append(outputs.to(self._cpu))
 
-        trainingResult.to(self._cpu)
+        learningResult.to(self._cpu)
         if device.type == "cuda":
             torch.cuda.empty_cache()
         return torch.concat(YPred)

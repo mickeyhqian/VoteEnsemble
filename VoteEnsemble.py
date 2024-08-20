@@ -9,18 +9,18 @@ from typing import List, Any, Tuple, Union
 
 
 
-class BaseTrainer(metaclass = ABCMeta):
+class BaseLearner(metaclass = ABCMeta):
     @abstractmethod
-    def train(self, sample: NDArray) -> Any:
+    def learn(self, sample: NDArray) -> Any:
         """
-        The training algorithm.
+        The learning algorithm.
 
         Args:
             sample: 
                 A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
 
         Returns:
-            A training result of any type, e.g., a solution scalar/vector (for optimization problems) or a machine learning model (for machine learning problems).
+            A learning result of any type, e.g., a solution scalar/vector (for optimization problems) or a machine learning model (for machine learning problems).
         """
         pass
 
@@ -28,28 +28,28 @@ class BaseTrainer(metaclass = ABCMeta):
     @abstractmethod
     def enableDeduplication(self):
         """
-        Property of whether or not to deduplicate training results from subsamples using the self.isDuplicate method.
+        Property of whether or not to deduplicate learning results from subsamples using the self.isDuplicate method.
 
-        - Use with BAG and ReBAG:
-            - BAG: BAG only accepts base trainers with self.enableDeduplication = True.
-            - ReBAG: ReBAG accepts any base trainer, but setting self.enableDeduplication = True when appropriate can reduce the computation.
+        - Use with MoVE and ROVE:
+            - MoVE: MoVE only accepts base learners with self.enableDeduplication = True.
+            - ROVE: ROVE accepts any base learner, but setting self.enableDeduplication = True when appropriate can reduce the computation.
             
         - Examples suggested to set self.enableDeduplication = True:
-            - Training problems with discrete spaces, such as combinatorial/integer optimization.
-            - Training problems with continuous spaces but training results selected from a discrete subspace, such as linear programs solved with the simplex method.
+            - Problems with discrete spaces, such as combinatorial/integer optimization.
+            - Problems with continuous spaces but learning results selected from a discrete subspace, such as linear programs solved with the simplex method.
         """
         pass
 
     @abstractmethod
     def isDuplicate(self, result1: Any, result2: Any) -> bool:
         """
-        Returns whether two training results are considered duplicates of each other.
+        Returns whether two learning results are considered duplicates of each other.
         
         Invoked only if self.enableDeduplication = True, can be arbitrarily defined otherwise.
 
         Args:
             result1, result2: 
-                Each is a training result output by self.train.
+                Each is a learning result output by self.learn.
 
         Returns:
             True/False.
@@ -57,16 +57,15 @@ class BaseTrainer(metaclass = ABCMeta):
         pass
 
     @abstractmethod
-    def objective(self, trainingResult: Any, sample: NDArray) -> float:
+    def objective(self, learningResult: Any, sample: NDArray) -> float:
         """
-        Evaluates the empirical objective for a training result on a data set.
-        This evaluation is to be used in the voting phase of ReBAG, and may or may not be the same as the training objective optimized by self.train.
-
-        Invoked in ReBAG only.
+        Evaluates the empirical objective for a learning result on a data set. self.learn may or may not attempt to optimize the same objective.
+        
+        Invoked in ROVE only. This evaluation is to be used in the voting phase of ROVE.
 
         Args:
-            trainingResult: 
-                A training result output by self.train.
+            learningResult: 
+                A learning result output by self.learn.
             sample: 
                 A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
 
@@ -81,70 +80,70 @@ class BaseTrainer(metaclass = ABCMeta):
         """
         Property of whether or not the objective defined by self.objective is to be minimized (as opposed to being maximized).
 
-        Invoked in ReBAG only.
+        Invoked in ROVE only.
         """
         pass
 
-    def toPickleable(self, trainingResult: Any) -> Any:
+    def toPickleable(self, learningResult: Any) -> Any:
         """
-        Transforms a training result to a pickleable object (e.g., basic python types).
+        Transforms a learning result to a pickleable object (e.g., basic python types).
 
-        Invoked only if parallel training/evaluation is enabled or subsampleResultsDir is provided in BAG/ReBAG.
+        Invoked only if parallel learning/evaluation is enabled or subsampleResultsDir is provided in MoVE/ROVE.
 
-        The default implementation directly returns trainingResult, and is to be overridden if trainingResult is not pickleable.
+        The default implementation directly returns learningResult, and is to be overridden if learningResult is not pickleable.
 
         Args:
-            trainingResult: 
-                A training result output by self.train.
+            learningResult: 
+                A learning result output by self.learn.
 
         Returns:
-            A pickleable representation of the training result.
+            A pickleable representation of the learning result.
         """
-        return trainingResult
+        return learningResult
 
-    def fromPickleable(self, pickleableTrainingResult: Any) -> Any:
+    def fromPickleable(self, pickleableLearningResult: Any) -> Any:
         """
         The inverse of toPickleable.
 
-        Invoked only if parallel training/evaluation is enabled or subsampleResultsDir is provided in BAG/ReBAG.
+        Invoked only if parallel learning/evaluation is enabled or subsampleResultsDir is provided in MoVE/ROVE.
 
-        The default implementation directly returns pickleableTrainingResult, and is to be overridden accordingly if toPickleable is overridden.
+        The default implementation directly returns pickleableLearningResult, and is to be overridden accordingly if toPickleable is overridden.
 
         Args:
-            pickleableTrainingResult: 
-                A pickleable representation of a training result output by self.train.
+            pickleableLearningResult: 
+                A pickleable representation of a learning result output by self.learn.
 
         Returns:
-            A training result.
+            A learning result.
         """
-        return pickleableTrainingResult
+        return pickleableLearningResult
     
-    def dumpTrainingResult(self, trainingResult: Any, destFile: str):
+    def dumpLearningResult(self, learningResult: Any, destFile: str):
         """
-        Dumps a training result to a file.
+        Dumps a learning result to a file.
 
         Args:
-            trainingResult: 
-                A training result output by self.train.
+            learningResult: 
+                A learning result output by self.learn.
             destFile: 
-                Path of a file to dump the training result into.
+                Path of a file to dump the learning result into.
         """
-        result = pickle.dumps(self.toPickleable(trainingResult))
+        result = pickle.dumps(self.toPickleable(learningResult))
         compressor = ZstdCompressor()
         result = compressor.compress(result)
         with open(destFile, "wb") as f:
             f.write(result)
 
-    def loadTrainingResult(self, sourceFile: str) -> Any:
+    def loadLearningResult(self, sourceFile: str) -> Any:
         """
-        Loads a training result from a file.
+        Loads a learning result from a file.
 
         Args:
             sourceFile: 
-                Path of a file to load the training result from.
+                Path of a file to load the learning result from.
 
         Returns:
-            A training result.
+            A learning result.
         """
         with open(sourceFile, "rb") as f:
             result = f.read()
@@ -153,29 +152,29 @@ class BaseTrainer(metaclass = ABCMeta):
         return self.fromPickleable(pickle.loads(result))
 
 
-class BaseBagging(metaclass = ABCMeta):
-    def __init__(self, baseTrainer: BaseTrainer, 
-                 numParallelTrain: int = 1, 
+class BaseVE(metaclass = ABCMeta):
+    def __init__(self, baseLearner: BaseLearner, 
+                 numParallelLearn: int = 1, 
                  randomState: Union[np.random.Generator, int, None] = None, 
                  subsampleResultsDir: Union[str, None] = None, 
                  deleteSubsampleResults: bool = True):
         """
         Args:
-            baseTrainer: 
-                A base trainer of type BaseTrainer.
-            numParallelTrain: 
-                Number of processes used for parallel training. A value <= 1 disables parallel training, default 1.
+            baseLearner: 
+                A base learner of type BaseLearner.
+            numParallelLearn: 
+                Number of processes used for parallel learning. A value <= 1 disables parallel learning, default 1.
             randomState: 
                 A random number generator or a seed to be used to initialize a random number generator. Default None, random initial state.
             subsampleResultsDir: 
-                A directory where training results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the training results are kept in RAM.
+                A directory where learning results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the learning results are kept in RAM.
             deleteSubsampleResults: 
-                Whether to delete training results on subsamples once bagging finishes when subsampleResultsDir is not None.
+                Whether to delete learning results on subsamples after finishing the algorithm when subsampleResultsDir is not None. Default True.
         """
-        if not isinstance(baseTrainer, BaseTrainer):
-            raise ValueError(f"baseTrainer must be of type {BaseTrainer.__name__}")
-        self._baseTrainer: BaseTrainer = baseTrainer
-        self._numParallelTrain: int = max(1, int(numParallelTrain))
+        if not isinstance(baseLearner, BaseLearner):
+            raise ValueError(f"baseLearner must be of type {BaseLearner.__name__}")
+        self._baseLearner: BaseLearner = baseLearner
+        self._numParallelLearn: int = max(1, int(numParallelLearn))
         if isinstance(randomState, np.random.Generator):
             self._rng = randomState
         elif isinstance(randomState, int) and randomState >= 0:
@@ -201,29 +200,29 @@ class BaseBagging(metaclass = ABCMeta):
             raise RuntimeError("subsampleResultsDir is not provided")
         return os.path.join(self._subsampleResultsDir, f"subsampleResult_{index}")
 
-    def _dumpSubsampleResult(self, trainingResult: Any, index: int):
-        self._baseTrainer.dumpTrainingResult(trainingResult, self._subsampleResultPath(index))
+    def _dumpSubsampleResult(self, learningResult: Any, index: int):
+        self._baseLearner.dumpLearningResult(learningResult, self._subsampleResultPath(index))
 
     def _loadSubsampleResult(self, index: int) -> Any:
-        return self._baseTrainer.loadTrainingResult(self._subsampleResultPath(index))
+        return self._baseLearner.loadLearningResult(self._subsampleResultPath(index))
 
-    def _subProcessTrain(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
+    def _subProcessLearn(self, sample: NDArray, subsampleList: List[Tuple[int, List[int]]], queue: Queue):
         for index, subsampleIndices in subsampleList:
-            trainingResult = self._baseTrainer.train(sample[subsampleIndices])
-            if trainingResult is not None:
+            learningResult = self._baseLearner.learn(sample[subsampleIndices])
+            if learningResult is not None:
                 if self._subsampleResultsDir is None:
-                    trainingResult = self._baseTrainer.toPickleable(trainingResult)
+                    learningResult = self._baseLearner.toPickleable(learningResult)
                 else:
-                    self._dumpSubsampleResult(trainingResult, index)
-                    trainingResult = True
-            queue.put((index, trainingResult))
+                    self._dumpSubsampleResult(learningResult, index)
+                    learningResult = True
+            queue.put((index, learningResult))
 
-    def _trainOnSubsamples(self, sample: NDArray, k: int, B: int) -> List:
+    def _learnOnSubsamples(self, sample: NDArray, k: int, B: int) -> List:
         if B <= 0:
-            raise ValueError(f"{self._trainOnSubsamples.__qualname__}: B = {B} <= 0")
+            raise ValueError(f"{self._learnOnSubsamples.__qualname__}: B = {B} <= 0")
         n: int = len(sample)
         if n < k:
-            raise ValueError(f"{self._trainOnSubsamples.__qualname__}: n = {n} < k = {k}")
+            raise ValueError(f"{self._learnOnSubsamples.__qualname__}: n = {n} < k = {k}")
         
         subsampleLists: List[List[Tuple[int, List[int]]]] = []
         processIndex = 0
@@ -232,63 +231,60 @@ class BaseBagging(metaclass = ABCMeta):
                 subsampleLists.append([])
             newSubsample = self._rng.choice(n, k, replace=False)
             subsampleLists[processIndex].append((b, newSubsample.tolist()))
-            processIndex = (processIndex + 1) % self._numParallelTrain
+            processIndex = (processIndex + 1) % self._numParallelLearn
 
-        trainingResultList: List = [None for _ in range(B)]
+        learningResultList: List = [None for _ in range(B)]
 
         if len(subsampleLists) <= 1:
             for subsampleList in subsampleLists:
                 for index, subsampleIndices in subsampleList:
-                    trainingResult = self._baseTrainer.train(sample[subsampleIndices])
-                    if trainingResult is not None and self._subsampleResultsDir is not None:
-                        self._dumpSubsampleResult(trainingResult, index)
-                        trainingResult = index
-                    trainingResultList[index] = trainingResult
+                    learningResult = self._baseLearner.learn(sample[subsampleIndices])
+                    if learningResult is not None and self._subsampleResultsDir is not None:
+                        self._dumpSubsampleResult(learningResult, index)
+                        learningResult = index
+                    learningResultList[index] = learningResult
         else:
             queue = Queue()
-            processList: List[Process] = [Process(target = self._subProcessTrain, args = (sample, subsampleList, queue), daemon = True) for subsampleList in subsampleLists]
+            processList: List[Process] = [Process(target = self._subProcessLearn, args = (sample, subsampleList, queue), daemon = True) for subsampleList in subsampleLists]
             
             for process in processList:
                 process.start()
 
             for _ in range(B):
-                index, trainingResult = queue.get()
-                if trainingResult is not None:
+                index, learningResult = queue.get()
+                if learningResult is not None:
                     if self._subsampleResultsDir is None:
-                        trainingResultList[index] = self._baseTrainer.fromPickleable(trainingResult)
+                        learningResultList[index] = self._baseLearner.fromPickleable(learningResult)
                     else:
-                        trainingResultList[index] = index
+                        learningResultList[index] = index
 
             for process in processList:
                 process.join()
 
-        return [entry for entry in trainingResultList if entry is not None]
+        return [entry for entry in learningResultList if entry is not None]
         
     @abstractmethod
     def run(self, sample: NDArray) -> Any:
-        """
-        Run Bagging on the base trainer.
-        """
         pass
 
 
-class BAG(BaseBagging):
-    def __init__(self, baseTrainer: BaseTrainer, 
-                 numParallelTrain: int = 1, 
+class MoVE(BaseVE):
+    def __init__(self, baseLearner: BaseLearner, 
+                 numParallelLearn: int = 1, 
                  randomState: Union[np.random.Generator, int, None] = None,
                  subsampleResultsDir: Union[str, None] = None, 
                  deleteSubsampleResults: bool = True):
-        super().__init__(baseTrainer, 
-                         numParallelTrain = numParallelTrain, 
+        super().__init__(baseLearner, 
+                         numParallelLearn = numParallelLearn, 
                          randomState = randomState, 
                          subsampleResultsDir = subsampleResultsDir, 
                          deleteSubsampleResults = deleteSubsampleResults)
-        if not self._baseTrainer.enableDeduplication:
-            raise ValueError("BAG does not accept base trainers with enableDeduplication = False")
+        if not self._baseLearner.enableDeduplication:
+            raise ValueError(f"{self.__class__.__name__} does not accept base learners with enableDeduplication = False")
 
     def run(self, sample: NDArray, k: int, B: int) -> Any:
         """
-        Run BAG on the base trainer.
+        Run MoVE on the base learner.
 
         Args:
             sample: 
@@ -299,28 +295,28 @@ class BAG(BaseBagging):
                 Number of subsamples to draw.
 
         Returns:
-            A training result.
+            A learning result.
         """
         self._prepareSubsampleResultDir()
 
-        trainingResults = self._trainOnSubsamples(np.asarray(sample), k, B)
+        learningResults = self._learnOnSubsamples(np.asarray(sample), k, B)
 
-        if len(trainingResults) == 0:
+        if len(learningResults) == 0:
             raise ValueError(f"{self.run.__qualname__}: empty candidate set")
         
         indexCountPairs: List[List[int]] = []
         maxIndex = 0
         maxCount = 0
-        for i in range(len(trainingResults)):
-            result1 = trainingResults[i]
+        for i in range(len(learningResults)):
+            result1 = learningResults[i]
             if self._subsampleResultsDir is not None:
                 result1 = self._loadSubsampleResult(result1)
             index = len(indexCountPairs)
             for j in range(len(indexCountPairs)):
-                result2 = trainingResults[indexCountPairs[j][0]]
+                result2 = learningResults[indexCountPairs[j][0]]
                 if self._subsampleResultsDir is not None:
                     result2 = self._loadSubsampleResult(result2)
-                if self._baseTrainer.isDuplicate(result1, result2):
+                if self._baseLearner.isDuplicate(result1, result2):
                     index = j
                     break
                     
@@ -334,44 +330,44 @@ class BAG(BaseBagging):
                 maxCount = indexCountPairs[index][1]
         
         if self._subsampleResultsDir is None:
-            return trainingResults[maxIndex]
+            return learningResults[maxIndex]
         else:
-            output = self._loadSubsampleResult(trainingResults[maxIndex])
+            output = self._loadSubsampleResult(learningResults[maxIndex])
             if self._deleteSubsampleResults:
-                for index in trainingResults:
+                for index in learningResults:
                     resultPath = self._subsampleResultPath(index)
                     if os.path.isfile(resultPath):
                         os.remove(resultPath)
             return output
 
 
-class ReBAG(BaseBagging):
-    def __init__(self, baseTrainer: BaseTrainer, 
+class ROVE(BaseVE):
+    def __init__(self, baseLearner: BaseLearner, 
                  dataSplit: bool, 
                  numParallelEval: int = 1, 
-                 numParallelTrain: int = 1, 
+                 numParallelLearn: int = 1, 
                  randomState: Union[np.random.Generator, int, None] = None,
                  subsampleResultsDir: Union[str, None] = None, 
                  deleteSubsampleResults: bool = True):
         """
         Args:
-            baseTrainer: 
-                A base trainer of type BaseTrainer.
+            baseLearner: 
+                A base learner of type BaseLearner.
             dataSplit: 
-                Whether or not (ReBAG-S vs ReBAG) to split the data across the model candidate retrieval phase and the majority-vote phase.
+                Whether or not (ROVEs vs ROVE) to split the data across the model candidate retrieval phase and the majority-vote phase.
             numParallelEval: 
-                Number of processes used for parallel evaluation of training objectives. A value <= 1 disables parallel evaluation. Default 1.
-            numParallelTrain: 
-                Number of processes used for parallel training. A value <= 1 disables parallel training, default 1.
+                Number of processes used for parallel evaluation of baseLearner.objective. A value <= 1 disables parallel evaluation. Default 1.
+            numParallelLearn: 
+                Number of processes used for parallel learning. A value <= 1 disables parallel learning, default 1.
             randomState: 
                 A random number generator or a seed to be used to initialize a random number generator. Default None, random initial state.
             subsampleResultsDir: 
-                A directory where training results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the training results are kept in RAM.
+                A directory where learning results on subsamples will be dumped to reduce RAM usage. Default None, i.e., all the learning results are kept in RAM.
             deleteSubsampleResults: 
-                Whether to delete training results on subsamples once bagging finishes when subsampleResultsDir is not None. Default True.
+                Whether to delete learning results on subsamples after finishing the algorithm when subsampleResultsDir is not None. Default True.
         """
-        super().__init__(baseTrainer, 
-                         numParallelTrain = numParallelTrain, 
+        super().__init__(baseLearner, 
+                         numParallelLearn = numParallelLearn, 
                          randomState = randomState,
                          subsampleResultsDir = subsampleResultsDir,
                          deleteSubsampleResults = deleteSubsampleResults)
@@ -382,11 +378,11 @@ class ReBAG(BaseBagging):
         indexToObj = {entry[0]: [] for entry in subsampleList}
         for candidate in candidateList:
             if self._subsampleResultsDir is None:
-                candidate = self._baseTrainer.fromPickleable(candidate)
+                candidate = self._baseLearner.fromPickleable(candidate)
             else:
                 candidate = self._loadSubsampleResult(candidate)
             for index, subsampleIndices in subsampleList:
-                indexToObj[index].append(self._baseTrainer.objective(candidate, sample[subsampleIndices]))
+                indexToObj[index].append(self._baseLearner.objective(candidate, sample[subsampleIndices]))
         
         for index, objList in indexToObj.items():
             queue.put((index, objList))
@@ -415,11 +411,11 @@ class ReBAG(BaseBagging):
                     candidate = self._loadSubsampleResult(candidate)
                 for subsampleList in subsampleLists:
                     for index, subsampleIndices in subsampleList:
-                        evalOutputList[index].append(self._baseTrainer.objective(candidate, sample[subsampleIndices]))
+                        evalOutputList[index].append(self._baseLearner.objective(candidate, sample[subsampleIndices]))
         else:
             queue = Queue()
             if self._subsampleResultsDir is None:
-                pickleableList = [self._baseTrainer.toPickleable(candidate) for candidate in candidateList]
+                pickleableList = [self._baseLearner.toPickleable(candidate) for candidate in candidateList]
             else:
                 pickleableList = candidateList
             processList: List[Process] = [Process(target = self._subProcessObjective, args = (pickleableList, sample, subsampleList, queue), daemon = True) for subsampleList in subsampleLists]
@@ -436,7 +432,7 @@ class ReBAG(BaseBagging):
 
         evalOutputList = np.asarray(evalOutputList, dtype = np.float64)
         if not np.isfinite(evalOutputList).all():
-            raise ValueError(f"{self._objectiveOnSubsamples.__qualname__}: failed to evaluate all the training objective values")
+            raise ValueError(f"{self._objectiveOnSubsamples.__qualname__}: failed to evaluate all the objective values")
 
         return evalOutputList
     
@@ -446,21 +442,21 @@ class ReBAG(BaseBagging):
 
     @staticmethod
     def _findEpsilon(gapMatrix: NDArray, autoEpsilonProb: float) -> float:
-        probArray = ReBAG._epsilonOptimalProb(gapMatrix, 0)
+        probArray = ROVE._epsilonOptimalProb(gapMatrix, 0)
         if probArray.max() >= autoEpsilonProb:
             return 0
         
         left, right = 0, 1
-        probArray = ReBAG._epsilonOptimalProb(gapMatrix, right)
+        probArray = ROVE._epsilonOptimalProb(gapMatrix, right)
         while probArray.max() < autoEpsilonProb:
             left = right
             right *= 2
-            probArray = ReBAG._epsilonOptimalProb(gapMatrix, right)
+            probArray = ROVE._epsilonOptimalProb(gapMatrix, right)
         
         tolerance = 1e-3
         while max(right - left, (right - left) / (abs(left) / 2 + abs(right) / 2 + 1e-5)) > tolerance:
             mid = (left + right) / 2
-            probArray = ReBAG._epsilonOptimalProb(gapMatrix, mid)
+            probArray = ROVE._epsilonOptimalProb(gapMatrix, mid)
             if probArray.max() >= autoEpsilonProb:
                 right = mid
             else:
@@ -469,7 +465,7 @@ class ReBAG(BaseBagging):
         return right
     
     def _gapMatrix(self, evalArray: NDArray) -> NDArray:
-        if self._baseTrainer.isMinimization:
+        if self._baseLearner.isMinimization:
             bestObj = evalArray.min(axis = 1, keepdims = True)
             gapMatrix = evalArray - bestObj
         else:
@@ -479,7 +475,7 @@ class ReBAG(BaseBagging):
 
     def run(self, sample: NDArray, k1: int, k2: int, B1: int, B2: int, epsilon: float = -1.0, autoEpsilonProb: float = 0.5) -> Any:
         """
-        Run ReBAG (self._dataSplit = False) or ReBAG-S (self._dataSplit = True) on the base trainer.
+        Run ROVE (self._dataSplit = False) or ROVEs (self._dataSplit = True) on the base learner.
 
         Args:
             sample: 
@@ -498,7 +494,7 @@ class ReBAG(BaseBagging):
                 The probability threshold guiding the auto-selection of epsilon. Default 0.5.
 
         Returns:
-            A training result.
+            A learning result.
         """
         sample = np.asarray(sample)
         sample1 = sample
@@ -513,29 +509,29 @@ class ReBAG(BaseBagging):
 
         self._prepareSubsampleResultDir()
 
-        trainingResults = self._trainOnSubsamples(sample1, k1, B1)
+        learningResults = self._learnOnSubsamples(sample1, k1, B1)
 
         retrievedList: List = []
-        if self._baseTrainer.enableDeduplication:
-            for i in range(len(trainingResults)):
-                result1 = trainingResults[i]
+        if self._baseLearner.enableDeduplication:
+            for i in range(len(learningResults)):
+                result1 = learningResults[i]
                 if self._subsampleResultsDir is not None:
                     result1 = self._loadSubsampleResult(result1)
                 existing = False
                 for result2 in retrievedList:
                     if self._subsampleResultsDir is not None:
                         result2 = self._loadSubsampleResult(result2)
-                    if self._baseTrainer.isDuplicate(result1, result2):
+                    if self._baseLearner.isDuplicate(result1, result2):
                         existing = True
                         break
 
                 if not existing:
-                    retrievedList.append(trainingResults[i])
+                    retrievedList.append(learningResults[i])
         else:
-            retrievedList = trainingResults
+            retrievedList = learningResults
 
         if len(retrievedList) == 0:
-            raise ValueError(f"{self.run.__qualname__}: failed to retrieve any training result")
+            raise ValueError(f"{self.run.__qualname__}: failed to retrieve any learning result")
         
         evalArray = self._objectiveOnSubsamples(retrievedList, sample2, k2, B2)
         gapMatrix = self._gapMatrix(evalArray)
@@ -545,18 +541,18 @@ class ReBAG(BaseBagging):
             if self._dataSplit:
                 evalArray = self._objectiveOnSubsamples(retrievedList, sample1, k2, B2)
                 gapMatrix1 = self._gapMatrix(evalArray)
-                epsilon = ReBAG._findEpsilon(gapMatrix1, autoEpsilonProb)
+                epsilon = ROVE._findEpsilon(gapMatrix1, autoEpsilonProb)
             else:
-                epsilon = ReBAG._findEpsilon(gapMatrix, autoEpsilonProb)
+                epsilon = ROVE._findEpsilon(gapMatrix, autoEpsilonProb)
     
-        probArray = ReBAG._epsilonOptimalProb(gapMatrix, epsilon)
+        probArray = ROVE._epsilonOptimalProb(gapMatrix, epsilon)
 
         if self._subsampleResultsDir is None:
             return retrievedList[np.argmax(probArray)]
         else:
             output = self._loadSubsampleResult(retrievedList[np.argmax(probArray)])
             if self._deleteSubsampleResults:
-                for index in trainingResults:
+                for index in learningResults:
                     resultPath = self._subsampleResultPath(index)
                     if os.path.isfile(resultPath):
                         os.remove(resultPath)

@@ -1,4 +1,4 @@
-from BaseTrainers import BaseLR
+from BaseLearners import BaseLR
 from ExpPipeline import pipeline
 import numpy as np
 from numpy.typing import NDArray
@@ -9,7 +9,7 @@ from uuid import uuid4
 import sys
 import os
 import logging
-logger = logging.getLogger(name = "Bagging")
+logger = logging.getLogger(name = "VE")
 
 
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     logHandler.setFormatter(formatter)
     logger.addHandler(logHandler)
 
-    d = 50
+    d = 10
     meanX = np.linspace(1, 10, num = d)
     beta = np.linspace(-10, 10, num = d)
     noiseShape = 2.1
@@ -40,8 +40,8 @@ if __name__ == "__main__":
         YSample = np.dot(XSample, np.reshape(beta, (-1,1))) + noise.reshape(-1, 1)
         return np.hstack((YSample, XSample))
 
-    def evaluator(trainingResult: LinearRegression, repIdx: int) -> float:
-        error = trainingResult.coef_ - beta
+    def evaluator(learningResult: LinearRegression, repIdx: int) -> float:
+        error = learningResult.coef_ - beta
         XVars = (2 * meanX)**2 / 12
         return np.dot(meanX, error) ** 2 + np.sum(error**2 * XVars)
 
@@ -64,5 +64,5 @@ if __name__ == "__main__":
              k12List, 
              B12List, 
              numReplicates, 
-             numParallelTrain = 1, 
+             numParallelLearn = 1, 
              numParallelEval = 1)

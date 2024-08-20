@@ -1,4 +1,4 @@
-from BaseTrainers import BaseNN, RegressionNN
+from BaseLearners import BaseNN, RegressionNN
 from ExpPipeline import pipeline
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ import sys
 import os
 import torch
 import logging
-logger = logging.getLogger(name = "Bagging")
+logger = logging.getLogger(name = "VE")
 
 
 
@@ -61,11 +61,11 @@ if __name__ == "__main__":
 
     evalDevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def evaluator(trainingResult: RegressionNN, repIdx: int) -> float:
+    def evaluator(learningResult: RegressionNN, repIdx: int) -> float:
         rng = np.random.default_rng(seed = seedList[repIdx])
         select = np.full(len(data), True)
         select[rng.choice(len(data), size = trainSize, replace = False)] = False
-        return baseNN.objective(trainingResult, data[select], device = evalDevice)
+        return baseNN.objective(learningResult, data[select], device = evalDevice)
 
     
     pipeline(resultDir,
@@ -78,7 +78,7 @@ if __name__ == "__main__":
              k12List, 
              B12List, 
              numReplicates, 
-             numParallelTrain = 1, 
+             numParallelLearn = 1, 
              numParallelEval = 1,
              dumpSubsampleResults = True,
              runConventionalBagging = False)
