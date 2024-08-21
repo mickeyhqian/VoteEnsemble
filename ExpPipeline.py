@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 import pickle
 import matplotlib.pyplot as plt
 import os
+from scipy.stats import norm
 from typing import List, Tuple, Callable, Any, Union
 import logging
 logger = logging.getLogger(name = "VE")
@@ -13,6 +14,7 @@ logger = logging.getLogger(name = "VE")
 
 class GracefulKiller:
     _killed: bool = False
+    _killFile: str = ""
 
     @classmethod
     def kill(cls, *args):
@@ -20,12 +22,15 @@ class GracefulKiller:
 
     @classmethod
     def isKilled(cls) -> bool:
-        return cls._killed
+        return cls._killed or (len(cls._killFile) > 0 and not os.path.isfile(cls._killFile))
 
     @classmethod
-    def setup(cls):
+    def setup(cls, killFile: str):
         signal.signal(signal.SIGINT, cls.kill)
         signal.signal(signal.SIGTERM, cls.kill)
+        cls._killFile = killFile
+        if len(cls._killFile) > 0:
+            open(cls._killFile, "w").close()
 
 
 class KilledByUser(Exception):
@@ -218,7 +223,7 @@ def loadResults(filePath: str):
         return pickle.load(f)
 
 
-def plotAverage(baseObjAvg: List, 
+def plotOngoingAverage(baseObjAvg: List, 
                 MoVEObjAvg: List, 
                 ROVEObjAvg: List, 
                 ROVEsObjAvg: List, 
@@ -255,7 +260,7 @@ def plotAverage(baseObjAvg: List,
     logger.info(f"saved a plot of average performance to {filePath}")
 
 
-def plotCDF(baseObjList: List, 
+def plotOngoingCDF(baseObjList: List, 
             MoVEObjList: List, 
             ROVEObjList: List, 
             ROVEsObjList: List, 
@@ -271,7 +276,7 @@ def plotCDF(baseObjList: List,
     if len(sampleSizeList) <= 1:
         ax = [ax]
 
-    def getCDF(sequence):
+    def getOngoingCDF(sequence):
         xList = []
         yList = []
         for num in sorted(sequence):
@@ -294,18 +299,18 @@ def plotCDF(baseObjList: List,
         return xList, tailList
 
     for i in range(len(sampleSizeList)):
-        xList, yList = getCDF(baseObjList[i])
+        xList, yList = getOngoingCDF(baseObjList[i])
         ax[i].plot(xList, yList, color = 'blue', linestyle = 'solid', label = 'base', linewidth = 2)
         for ind1, B in enumerate(BList):
             for ind2, k in enumerate(kList):
-                xList, yList = getCDF(MoVEObjList[i][ind1][ind2])
+                xList, yList = getOngoingCDF(MoVEObjList[i][ind1][ind2])
                 ax[i].plot(xList, yList, linestyle = 'solid', label = f'{MoVE.__name__}, B={B}, k={k}', linewidth = 2)
         
         for ind1, B12 in enumerate(B12List):
             for ind2, k in enumerate(k12List):
-                xList, yList = getCDF(ROVEObjList[i][ind1][ind2])
+                xList, yList = getOngoingCDF(ROVEObjList[i][ind1][ind2])
                 ax[i].plot(xList, yList, linestyle = 'solid', label = f'{ROVE.__name__}, B12={B12}, k12={k}', linewidth = 2)
-                xList, yList = getCDF(ROVEsObjList[i][ind1][ind2])
+                xList, yList = getOngoingCDF(ROVEsObjList[i][ind1][ind2])
                 ax[i].plot(xList, yList, linestyle = 'solid', label = f'{ROVE.__name__}s, B12={B12}, k12={k}', linewidth = 2)
         
         if i == len(sampleSizeList) - 1:
@@ -368,7 +373,7 @@ def pipeline(resultDir: str,
     avgFigPath = os.path.join(resultDir, "avgPlot.png")
     cdfFigPath = os.path.join(resultDir, "cdfPlot.png")
 
-    GracefulKiller.setup()
+    GracefulKiller.setup(os.path.join(resultDir, "DEL_TO_KILL"))
 
     try:
         for sampleSize in sampleSizeList:
@@ -433,27 +438,179 @@ def pipeline(resultDir: str,
                             numReplicates,
                             evalResultFile)
             
-            plotAverage(baseObjAvg, 
-                        MoVEObjAvg, 
-                        ROVEObjAvg, 
-                        ROVEsObjAvg,
-                        sampleSizeFinished, 
-                        kList, 
-                        BList, 
-                        k12List, 
-                        B12List,
-                        avgFigPath)
+            plotOngoingAverage(baseObjAvg, 
+                               MoVEObjAvg, 
+                               ROVEObjAvg, 
+                               ROVEsObjAvg,
+                               sampleSizeFinished, 
+                               kList, 
+                               BList, 
+                               k12List, 
+                               B12List,
+                               avgFigPath)
             
-            plotCDF(baseObjList, 
-                    MoVEObjList, 
-                    ROVEObjList, 
-                    ROVEsObjList, 
-                    sampleSizeFinished, 
-                    kList, 
-                    BList, 
-                    k12List, 
-                    B12List,
-                    cdfFigPath)
+            plotOngoingCDF(baseObjList, 
+                           MoVEObjList, 
+                           ROVEObjList, 
+                           ROVEsObjList, 
+                           sampleSizeFinished, 
+                           kList, 
+                           BList, 
+                           k12List, 
+                           B12List,
+                           cdfFigPath)
             
     except KilledByUser:
         logger.info("The experiment is killed")
+        
+        
+default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+
+def plotAvgWithError(baseObjList: List, 
+                     MoVEObjList: List,
+                     ROVEObjList: List, 
+                     ROVEsObjList: List, 
+                     baggingObjList: List,
+                     numReplicates: int,
+                     confidenceLevel: float,
+                     sampleSizeList: List, 
+                     filePath: str,
+                     xLogScale: bool = True,
+                     yLogScale: bool = False):
+    def error(stdArray, numReplicates, confidenceLevel):
+        return norm.ppf(0.5 + confidenceLevel / 2) * np.asarray(stdArray) / np.sqrt(numReplicates)
+    
+    baseObjAvg = np.array([np.mean(baseObjList[i]) for i in range(len(sampleSizeList))])
+    baseObjStd = np.array([np.std(baseObjList[i]) for i in range(len(sampleSizeList))])
+    baseObjError = error(baseObjStd, numReplicates, confidenceLevel)
+    MoVEObjAvg = []
+    MoVEObjStd = []
+    MoVEObjError = []
+    if len(MoVEObjList) > 0 and len(MoVEObjList[0]) > 0 and len(MoVEObjList[0][0]) > 0 and len(MoVEObjList[0][0][0]) > 0:
+        MoVEObjAvg = np.array([np.mean(MoVEObjList[i][0][0]) for i in range(len(sampleSizeList))])
+        MoVEObjStd = np.array([np.std(MoVEObjList[i][0][0]) for i in range(len(sampleSizeList))])
+        MoVEObjError = error(MoVEObjStd, numReplicates, confidenceLevel)
+    ROVEObjAvg = np.array([np.mean(ROVEObjList[i][0][0]) for i in range(len(sampleSizeList))])
+    ROVEObjStd = np.array([np.std(ROVEObjList[i][0][0]) for i in range(len(sampleSizeList))])
+    ROVEObjError = error(ROVEObjStd, numReplicates, confidenceLevel)
+    ROVEsObjAvg = np.array([np.mean(ROVEsObjList[i][0][0]) for i in range(len(sampleSizeList))])
+    ROVEsObjStd = np.array([np.std(ROVEsObjList[i][0][0]) for i in range(len(sampleSizeList))])
+    ROVEsObjError = error(ROVEsObjStd, numReplicates, confidenceLevel)
+    baggingObjAvg = []
+    baggingObjStd = []
+    baggingObjError = []
+    if len(baggingObjList) > 0:
+        baggingObjAvg = np.array([np.mean(baggingObjList[i]) for i in range(len(sampleSizeList))])
+        baggingObjStd = np.array([np.std(baggingObjList[i]) for i in range(len(sampleSizeList))])
+        baggingObjError = error(baggingObjStd, numReplicates, confidenceLevel)
+    
+    if yLogScale:
+        globalMin = min(baseObjAvg.min(), ROVEObjAvg.min(), ROVEsObjAvg.min())
+        lb = baseObjAvg - baseObjError
+        globalMin = min(globalMin, lb[lb > 0].min())
+        lb = ROVEObjAvg - ROVEObjError
+        globalMin = min(globalMin, lb[lb > 0].min())
+        lb = ROVEsObjAvg - ROVEsObjError
+        globalMin = min(globalMin, lb[lb > 0].min())
+        if len(MoVEObjAvg) > 0:
+            globalMin = min(globalMin, MoVEObjAvg.min())
+            lb = MoVEObjAvg - MoVEObjError
+            globalMin = min(globalMin, lb[lb > 0].min())
+        if len(baggingObjAvg) > 0:
+            globalMin = min(globalMin, baggingObjAvg.min())
+            lb = baggingObjAvg - baggingObjError
+            globalMin = min(globalMin, lb[lb > 0].min())
+        globalMin /= 2
+    else:
+        globalMin = 0
+    
+    fig, ax = plt.subplots()
+    markersize = None
+    ax.errorbar(sampleSizeList, baseObjAvg, yerr = [baseObjAvg - np.maximum(globalMin, baseObjAvg - baseObjError), baseObjError], marker = 'o', markersize = markersize, capsize = 5, color = default_colors[0], linestyle = '-', label = 'base')
+    if len(MoVEObjAvg) > 0:
+        ax.errorbar(np.array(sampleSizeList) * 1.03, MoVEObjAvg, yerr = [MoVEObjAvg - np.maximum(globalMin, MoVEObjAvg - MoVEObjError), MoVEObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[1], linestyle = '--', label = MoVE.__name__)
+    ax.errorbar(np.array(sampleSizeList) * 1.03, ROVEObjAvg, yerr = [ROVEObjAvg - np.maximum(globalMin, ROVEObjAvg - ROVEObjError), ROVEObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[2], linestyle = '--', label = ROVE.__name__)
+    ax.errorbar(np.array(sampleSizeList) * 1.06, ROVEsObjAvg, yerr = [ROVEsObjAvg - np.maximum(globalMin, ROVEsObjAvg - ROVEsObjError), ROVEsObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[3], linestyle = '--', label = f"{ROVE.__name__}s")
+    if len(baggingObjAvg) > 0:
+        ax.errorbar(np.array(sampleSizeList) * 1.09, baggingObjAvg, yerr = [baggingObjAvg - np.maximum(globalMin, baggingObjAvg - baggingObjError), baggingObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[4], linestyle = '-.', label = 'Bagging')
+
+    ax.set_xlabel('sample size', size = 16)
+    ax.set_ylabel('cost', size = 16)
+    if xLogScale:
+        ax.set_xscale('log')
+    if yLogScale:
+        ax.set_yscale('log')
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
+    ax.grid()
+    # ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3 + (len(baggingObjAvg) > 0), fontsize = 14, frameon = False)
+    
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    os.makedirs(os.path.dirname(filePath), exist_ok = True)
+    fig.savefig(filePath, dpi = 500)
+
+def plotCDF(baseObjList: List, 
+            MoVEObjList: List,
+            ROVEObjList: List, 
+            ROVEsObjList: List, 
+            baggingObjList: List,
+            filePath: str,
+            xLogScale: bool = False,
+            yLogScale: bool = True):
+    fig, ax = plt.subplots()
+
+    def getCDF(sequence):
+        xList = []
+        yList = []
+        for num in sorted(sequence):
+            if len(xList) == 0:
+                xList.append(num)
+                yList.append(1 / len(sequence))
+            elif num > xList[-1]:
+                xList.append(num)
+                yList.append(yList[-1] + 1 / len(sequence))
+            else:
+                yList[-1] += 1 / len(sequence)
+        
+        tailList = []
+        for i in range(len(yList)):
+            if i == 0:
+                tailList.append(1)
+            else:
+                tailList.append(1 - yList[i - 1])
+
+        return xList, tailList
+
+    xList, yList = getCDF(baseObjList)
+    ax.plot(xList, yList, color = default_colors[0], linestyle = '-', label = 'base', linewidth = 2)
+    if len(MoVEObjList) > 0 and len(MoVEObjList[0]) > 0 and len(MoVEObjList[0][0]) > 0:
+        xList, yList = getCDF(MoVEObjList[0][0])
+        ax.plot(xList, yList, color = default_colors[1], linestyle = '-.', label = MoVE.__name__, linewidth = 2)
+    xList, yList = getCDF(ROVEObjList[0][0])
+    ax.plot(xList, yList, color = default_colors[2], linestyle = '--', label = ROVE.__name__, linewidth = 2)
+    xList, yList = getCDF(ROVEsObjList[0][0])
+    ax.plot(xList, yList, color = default_colors[3], linestyle = '--', label = f"{ROVE.__name__}s", linewidth = 2)
+    if len(baggingObjList) > 0:
+        xList, yList = getCDF(baggingObjList)
+        ax.plot(xList, yList, color = default_colors[4], linestyle = '-.', label = 'Bagging', linewidth = 2)
+    
+    ax.set_xlabel('cost', size = 16)
+    ax.set_ylabel('tail prob.', size = 16)
+    if xLogScale:
+        ax.set_xscale('log')
+    if yLogScale:
+        ax.set_yscale('log')
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
+    ax.grid()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3 + (len(baggingObjList) > 0), fontsize = 14, frameon = False)
+    # # Create a legend using the first subplot
+    # handles, labels = ax.get_legend_handles_labels()
+
+    # # Place the combined legend outside the subplots
+    # fig.legend(handles, labels, loc = 'upper center', bbox_to_anchor = (0.5, 0.95), fontsize = 'small')
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    os.makedirs(os.path.dirname(filePath), exist_ok = True)
+    fig.savefig(filePath, dpi = 500)
