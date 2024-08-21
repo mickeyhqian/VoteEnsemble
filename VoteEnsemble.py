@@ -354,7 +354,7 @@ class ROVE(BaseVE):
             baseLearner: 
                 A base learner of type BaseLearner.
             dataSplit: 
-                Whether or not (ROVEs vs ROVE) to split the data across the model candidate retrieval phase and the majority-vote phase.
+                Whether or not (ROVEs vs ROVE) to split the data across the model candidate retrieval phase and the voting phase.
             numParallelEval: 
                 Number of processes used for parallel evaluation of baseLearner.objective. A value <= 1 disables parallel evaluation. Default 1.
             numParallelLearn: 
@@ -483,11 +483,11 @@ class ROVE(BaseVE):
             k1: 
                 Subsample size for the model candidate retrieval phase.
             k2: 
-                Subsample size for the majority-vote phase.
+                Subsample size for the voting phase.
             B1: 
                 Number of subsamples to draw in the model candidate retrieval phase.
             B2: 
-                Number of subsamples to draw in the majority-vote phase.
+                Number of subsamples to draw in the voting phase.
             epsilon: 
                 The suboptimality threshold. Any value < 0 leads to auto-selection. Default -1.0.
             autoEpsilonProb: 
