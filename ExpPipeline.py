@@ -478,61 +478,61 @@ def plotAvgWithError(baseObjList: List,
                      filePath: str,
                      xLogScale: bool = True,
                      yLogScale: bool = False):
-    def error(stdArray, numReplicates, confidenceLevel):
-        return norm.ppf(0.5 + confidenceLevel / 2) * np.asarray(stdArray) / np.sqrt(numReplicates)
+    def getAvgWithError(objList: List[List[float]]):
+        if len(objList) > 0 and len(objList[0]) > 0:
+            objAvg = np.array([np.mean(objList[i]) for i in range(len(sampleSizeList))])
+            objStd = np.array([np.std(objList[i]) for i in range(len(sampleSizeList))])
+            objError = norm.ppf(0.5 + confidenceLevel / 2) * objStd / np.sqrt(numReplicates)
+            return objAvg, objError
+        return [], []
     
-    baseObjAvg = np.array([np.mean(baseObjList[i]) for i in range(len(sampleSizeList))])
-    baseObjStd = np.array([np.std(baseObjList[i]) for i in range(len(sampleSizeList))])
-    baseObjError = error(baseObjStd, numReplicates, confidenceLevel)
-    MoVEObjAvg = []
-    MoVEObjStd = []
-    MoVEObjError = []
-    if len(MoVEObjList) > 0 and len(MoVEObjList[0]) > 0 and len(MoVEObjList[0][0]) > 0 and len(MoVEObjList[0][0][0]) > 0:
-        MoVEObjAvg = np.array([np.mean(MoVEObjList[i][0][0]) for i in range(len(sampleSizeList))])
-        MoVEObjStd = np.array([np.std(MoVEObjList[i][0][0]) for i in range(len(sampleSizeList))])
-        MoVEObjError = error(MoVEObjStd, numReplicates, confidenceLevel)
-    ROVEObjAvg = np.array([np.mean(ROVEObjList[i][0][0]) for i in range(len(sampleSizeList))])
-    ROVEObjStd = np.array([np.std(ROVEObjList[i][0][0]) for i in range(len(sampleSizeList))])
-    ROVEObjError = error(ROVEObjStd, numReplicates, confidenceLevel)
-    ROVEsObjAvg = np.array([np.mean(ROVEsObjList[i][0][0]) for i in range(len(sampleSizeList))])
-    ROVEsObjStd = np.array([np.std(ROVEsObjList[i][0][0]) for i in range(len(sampleSizeList))])
-    ROVEsObjError = error(ROVEsObjStd, numReplicates, confidenceLevel)
-    baggingObjAvg = []
-    baggingObjStd = []
-    baggingObjError = []
-    if len(baggingObjList) > 0:
-        baggingObjAvg = np.array([np.mean(baggingObjList[i]) for i in range(len(sampleSizeList))])
-        baggingObjStd = np.array([np.std(baggingObjList[i]) for i in range(len(sampleSizeList))])
-        baggingObjError = error(baggingObjStd, numReplicates, confidenceLevel)
+    baseObjAvg, baseObjError = getAvgWithError(baseObjList)
+    MoVEObjAvg, MoVEObjError = getAvgWithError(MoVEObjList)
+    ROVEObjAvg, ROVEObjError = getAvgWithError(ROVEObjList)
+    ROVEsObjAvg, ROVEsObjError = getAvgWithError(ROVEsObjList)
+    baggingObjAvg, baggingObjError = getAvgWithError(baggingObjList)
+        
+    if len(baseObjAvg) == 0 and len(MoVEObjAvg) == 0 and len(ROVEObjAvg) == 0 and len(ROVEsObjAvg) == 0 and len(baggingObjAvg) == 0:
+        return
     
     if yLogScale:
-        globalMin = min(baseObjAvg.min(), ROVEObjAvg.min(), ROVEsObjAvg.min())
-        lb = baseObjAvg - baseObjError
-        globalMin = min(globalMin, lb[lb > 0].min())
-        lb = ROVEObjAvg - ROVEObjError
-        globalMin = min(globalMin, lb[lb > 0].min())
-        lb = ROVEsObjAvg - ROVEsObjError
-        globalMin = min(globalMin, lb[lb > 0].min())
-        if len(MoVEObjAvg) > 0:
-            globalMin = min(globalMin, MoVEObjAvg.min())
-            lb = MoVEObjAvg - MoVEObjError
-            globalMin = min(globalMin, lb[lb > 0].min())
-        if len(baggingObjAvg) > 0:
-            globalMin = min(globalMin, baggingObjAvg.min())
-            lb = baggingObjAvg - baggingObjError
-            globalMin = min(globalMin, lb[lb > 0].min())
+        def getMin(objAvg: NDArray, objError: NDArray):
+            if len(objAvg) > 0:
+                lb = objAvg - objError
+                return min(objAvg.min(), lb[lb > 0].min())
+            return float("inf")
+        
+        globalMin = float("inf")
+        globalMin = min(globalMin, getMin(baseObjAvg, baseObjError))
+        globalMin = min(globalMin, getMin(MoVEObjAvg, MoVEObjError))
+        globalMin = min(globalMin, getMin(ROVEObjAvg, ROVEObjError))
+        globalMin = min(globalMin, getMin(ROVEsObjAvg, ROVEsObjError))
+        globalMin = min(globalMin, getMin(baggingObjAvg, baggingObjError))
         globalMin /= 2
+        
+        if globalMin <= 0:
+            yLogScale = False
+            globalMin = -float("inf")
     else:
-        globalMin = 0
+        globalMin = -float("inf")
     
     fig, ax = plt.subplots()
     markersize = None
-    ax.errorbar(sampleSizeList, baseObjAvg, yerr = [baseObjAvg - np.maximum(globalMin, baseObjAvg - baseObjError), baseObjError], marker = 'o', markersize = markersize, capsize = 5, color = default_colors[0], linestyle = '-', label = 'base')
+    numLines = 0
+    if len(baseObjAvg) > 0:
+        numLines += 1
+        ax.errorbar(sampleSizeList, baseObjAvg, yerr = [baseObjAvg - np.maximum(globalMin, baseObjAvg - baseObjError), baseObjError], marker = 'o', markersize = markersize, capsize = 5, color = default_colors[0], linestyle = '-', label = 'base')
     if len(MoVEObjAvg) > 0:
+        numLines += 1
         ax.errorbar(np.array(sampleSizeList) * 1.03, MoVEObjAvg, yerr = [MoVEObjAvg - np.maximum(globalMin, MoVEObjAvg - MoVEObjError), MoVEObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[1], linestyle = '--', label = MoVE.__name__)
-    ax.errorbar(np.array(sampleSizeList) * 1.03, ROVEObjAvg, yerr = [ROVEObjAvg - np.maximum(globalMin, ROVEObjAvg - ROVEObjError), ROVEObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[2], linestyle = '--', label = ROVE.__name__)
-    ax.errorbar(np.array(sampleSizeList) * 1.06, ROVEsObjAvg, yerr = [ROVEsObjAvg - np.maximum(globalMin, ROVEsObjAvg - ROVEsObjError), ROVEsObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[3], linestyle = '--', label = f"{ROVE.__name__}s")
+    if len(ROVEObjAvg) > 0:
+        numLines += 1
+        ax.errorbar(np.array(sampleSizeList) * 1.03, ROVEObjAvg, yerr = [ROVEObjAvg - np.maximum(globalMin, ROVEObjAvg - ROVEObjError), ROVEObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[2], linestyle = '--', label = ROVE.__name__)
+    if len(ROVEsObjAvg) > 0:
+        numLines += 1
+        ax.errorbar(np.array(sampleSizeList) * 1.06, ROVEsObjAvg, yerr = [ROVEsObjAvg - np.maximum(globalMin, ROVEsObjAvg - ROVEsObjError), ROVEsObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[3], linestyle = '--', label = f"{ROVE.__name__}s")
     if len(baggingObjAvg) > 0:
+        numLines += 1
         ax.errorbar(np.array(sampleSizeList) * 1.09, baggingObjAvg, yerr = [baggingObjAvg - np.maximum(globalMin, baggingObjAvg - baggingObjError), baggingObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[4], linestyle = '-.', label = 'Bagging')
 
     ax.set_xlabel('sample size', size = 16)
@@ -545,7 +545,7 @@ def plotAvgWithError(baseObjList: List,
     ax.tick_params(axis='y', labelsize=14)
     ax.grid()
     # ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3 + (len(baggingObjAvg) > 0), fontsize = 14, frameon = False)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol = numLines, fontsize = 14, frameon = False)
     
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     os.makedirs(os.path.dirname(filePath), exist_ok = True)
@@ -583,29 +583,47 @@ def plotCDF(baseObjList: List,
 
         return xList, tailList
 
-    xList, yList = getCDF(baseObjList)
-    ax.plot(xList, yList, color = default_colors[0], linestyle = '-', label = 'base', linewidth = 2)
-    if len(MoVEObjList) > 0 and len(MoVEObjList[0]) > 0 and len(MoVEObjList[0][0]) > 0:
-        xList, yList = getCDF(MoVEObjList[0][0])
+    numLines = 0
+    minX = float("inf")
+    if len(baseObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(baseObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[0], linestyle = '-', label = 'base', linewidth = 2)
+    if len(MoVEObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(MoVEObjList)
+        minX = min(minX, np.amin(xList))
         ax.plot(xList, yList, color = default_colors[1], linestyle = '-.', label = MoVE.__name__, linewidth = 2)
-    xList, yList = getCDF(ROVEObjList[0][0])
-    ax.plot(xList, yList, color = default_colors[2], linestyle = '--', label = ROVE.__name__, linewidth = 2)
-    xList, yList = getCDF(ROVEsObjList[0][0])
-    ax.plot(xList, yList, color = default_colors[3], linestyle = '--', label = f"{ROVE.__name__}s", linewidth = 2)
+    if len(ROVEObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(ROVEObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[2], linestyle = '--', label = ROVE.__name__, linewidth = 2)
+    if len(ROVEsObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(ROVEsObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[3], linestyle = '--', label = f"{ROVE.__name__}s", linewidth = 2)
     if len(baggingObjList) > 0:
+        numLines += 1
         xList, yList = getCDF(baggingObjList)
+        minX = min(minX, np.amin(xList))
         ax.plot(xList, yList, color = default_colors[4], linestyle = '-.', label = 'Bagging', linewidth = 2)
+        
+    if numLines == 0:
+        return
     
     ax.set_xlabel('cost', size = 16)
     ax.set_ylabel('tail prob.', size = 16)
-    if xLogScale:
+    if xLogScale and minX > 0:
         ax.set_xscale('log')
     if yLogScale:
         ax.set_yscale('log')
     ax.tick_params(axis='x', labelsize=14)
     ax.tick_params(axis='y', labelsize=14)
     ax.grid()
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3 + (len(baggingObjList) > 0), fontsize = 14, frameon = False)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol = numLines, fontsize = 14, frameon = False)
     # # Create a legend using the first subplot
     # handles, labels = ax.get_legend_handles_labels()
 
