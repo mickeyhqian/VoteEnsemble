@@ -57,9 +57,9 @@ class BaseLearner(metaclass = ABCMeta):
         pass
 
     @abstractmethod
-    def objective(self, learningResult: Any, sample: NDArray) -> float:
+    def objective(self, learningResult: Any, sample: NDArray) -> NDArray:
         """
-        Evaluates the empirical objective for a learning result on a data set. self.learn may or may not attempt to optimize the same objective.
+        Evaluates the objective for a learning result on a data set. self.learn may or may not attempt to optimize the same objective.
         
         Invoked in ROVE only. This evaluation is to be used in the voting phase of ROVE.
 
@@ -70,7 +70,7 @@ class BaseLearner(metaclass = ABCMeta):
                 A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
 
         Returns:
-            The empirical objective value.
+            A numpy array consisting of an objective value per data point.
         """
         pass
 
