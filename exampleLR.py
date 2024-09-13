@@ -46,6 +46,8 @@ if __name__ == "__main__":
     sample = np.hstack((dataY, dataX))
     lr = BaseLR()
 
+    # skip MoVE as lr.enableDeduplication() == False
+    
     roveLR = ROVE(lr, False, randomState = 666)
     tic = time.time()
     output = roveLR.run(sample, 1000, 500, 50, 200)
