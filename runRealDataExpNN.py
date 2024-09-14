@@ -65,7 +65,7 @@ if __name__ == "__main__":
         rng = np.random.default_rng(seed = seedList[repIdx])
         select = np.full(len(data), True)
         select[rng.choice(len(data), size = trainSize, replace = False)] = False
-        return baseNN.objective(learningResult, data[select], device = evalDevice)
+        return baseNN.objective(learningResult, data[select], device = evalDevice).mean()
 
     
     pipeline(resultDir,

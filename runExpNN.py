@@ -61,7 +61,7 @@ if __name__ == "__main__":
     evalDevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def evaluator(learningResult: RegressionNN, repIndex: int) -> float:
-        return baseNN.objective(learningResult, evalSample, device = evalDevice)
+        return baseNN.objective(learningResult, evalSample, device = evalDevice).mean()
 
 
     sampleSizeList = [2**i for i in range(10, 17)]
