@@ -2,7 +2,6 @@ from VoteEnsemble import ROVE, BaseLearner
 import numpy as np
 from numpy.typing import NDArray
 from sklearn.linear_model import LinearRegression
-from multiprocessing import set_start_method
 import time
 
 
@@ -25,9 +24,9 @@ class BaseLR(BaseLearner):
     def isDuplicate(self):
         pass
     
-    def objective(self, learningResult: LinearRegression, sample: NDArray) -> float:
+    def objective(self, learningResult: LinearRegression, sample: NDArray) -> NDArray:
         error = learningResult.predict(sample[:, 1:]) - sample[:, 0]
-        return np.mean(error ** 2)
+        return error ** 2
 
     @property
     def isMinimization(self):
@@ -35,8 +34,6 @@ class BaseLR(BaseLearner):
 
 
 if __name__ == "__main__":
-    set_start_method("spawn")
-        
     rngData = np.random.default_rng(seed = 888)
 
     d = 10

@@ -1,7 +1,6 @@
 from VoteEnsemble import MoVE, ROVE, BaseLearner
 import numpy as np
 from numpy.typing import NDArray
-from multiprocessing import set_start_method
 import cvxpy as cp
 import time
 
@@ -35,8 +34,8 @@ class BaseLP(BaseLearner):
     def isDuplicate(self, result1: NDArray, result2: NDArray) -> bool:
         return np.max(np.abs(result1 - result2)) < 1e-6
 
-    def objective(self, learningResult: NDArray, sample: NDArray) -> float:
-        return np.dot(np.mean(sample, axis = 0), learningResult)
+    def objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
+        return np.dot(sample, learningResult)
 
     @property
     def isMinimization(self):
@@ -44,8 +43,6 @@ class BaseLP(BaseLearner):
     
 
 if __name__ == "__main__":
-    set_start_method("spawn")
-        
     rngData = np.random.default_rng(seed = 888)
 
     d = 10
@@ -59,17 +56,17 @@ if __name__ == "__main__":
     c = -rngLP.uniform(low=0, high=1, size=d)
     sample = rngData.normal(loc = c, size = (10000, len(c)))
 
-    moveLP = MoVE(lp, randomState = 666)
+    moveLP = MoVE(lp, randomState = 666, numParallelLearn = 4)
     tic = time.time()
     output = moveLP.run(sample, 500, 200)
     print(f"{MoVE.__name__} took {time.time() - tic} secs, result: ", output)
 
-    roveLP = ROVE(lp, False, randomState = 666)
+    roveLP = ROVE(lp, False, randomState = 666, numParallelLearn = 4)
     tic = time.time()
     output = roveLP.run(sample, 1000, 500, 50, 200)
     print(f"{ROVE.__name__} took {time.time() - tic} secs, result: ", output)
 
-    rovesLP = ROVE(lp, True, randomState = 666)
+    rovesLP = ROVE(lp, True, randomState = 666, numParallelLearn = 4)
     tic = time.time()
     output = rovesLP.run(sample, 1000, 500, 50, 200)
     print(f"{ROVE.__name__}s took {time.time() - tic} secs, result: ", output)
