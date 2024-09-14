@@ -293,6 +293,7 @@ class _CachedEvaluator:
                 process.start()
 
             processStatus = [_ProcessStatus.Created] * len(processList)
+            finished = [False] * len(indicesPerProcess)
             while any(status != _ProcessStatus.Error and status != _ProcessStatus.Finished for status in processStatus):
                 i, objectiveList = queue.get()
                 if isinstance(objectiveList, _ProcessStatus):
@@ -300,6 +301,7 @@ class _CachedEvaluator:
                     if objectiveList == _ProcessStatus.Error:
                         success = False
                 else:
+                    finished[i] = True
                     objectiveList = np.asarray(objectiveList, dtype = np.float64)
                     if not np.isfinite(objectiveList).all():
                         success = False
@@ -308,6 +310,9 @@ class _CachedEvaluator:
 
             for process in processList:
                 process.join()
+                
+            if success and not all(finished):
+                success = False
                 
         if not success:
             raise ValueError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
