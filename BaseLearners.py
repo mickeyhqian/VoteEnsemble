@@ -249,9 +249,7 @@ class BaseNN(BaseLearner):
         dataset = TensorDataset(tensorX, tensorY)  # Create dataset
         dataloader = DataLoader(dataset, batch_size = 131072, shuffle = False)  # Create DataLoader
 
-        obj = self._evaluate(learningResult, dataloader, device).to(self._cpu).numpy()
-        
-        print("obj shape = ", obj.shape)
+        obj = self._evaluate(learningResult, dataloader, device).to(self._cpu).numpy().flatten()
 
         learningResult.to(self._cpu)
         if device.type == "cuda":
