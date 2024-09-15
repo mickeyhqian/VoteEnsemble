@@ -194,6 +194,7 @@ class _ProcessStatus(Enum):
 
 def _subProcessLearn(baseLearner: BaseLearner, subsampleResultsDir: Union[str, None], sample: NDArray, subsampleList: List[Tuple[int, List[int]]], processID: int, queue: Queue):
     queue.put((processID, _ProcessStatus.Started))
+    exitStatus = _ProcessStatus.Error
     try:
         for index, subsampleIndices in subsampleList:
             learningResult = baseLearner.learn(sample[subsampleIndices])
@@ -204,15 +205,14 @@ def _subProcessLearn(baseLearner: BaseLearner, subsampleResultsDir: Union[str, N
                     _SubsampleResultIO._dumpSubsampleResult(baseLearner, learningResult, subsampleResultsDir, index)
                     learningResult = True
             queue.put((index, learningResult))
-    except Exception as e:
-        queue.put((processID, _ProcessStatus.Error))
-        raise e
-    else:
-        queue.put((processID, _ProcessStatus.Finished))
+        exitStatus = _ProcessStatus.Finished
+    finally:
+        queue.put((processID, exitStatus))
         
         
 def _subProcessObjective(subsampleResultList: List, baseLearner: BaseLearner, subsampleResultsDir: Union[str, None], sample: NDArray, index: int, queue: Queue):
     queue.put((index, _ProcessStatus.Started))
+    exitStatus = _ProcessStatus.Error
     try:
         objectiveList = []
         for candidate in subsampleResultList:
@@ -222,11 +222,9 @@ def _subProcessObjective(subsampleResultList: List, baseLearner: BaseLearner, su
                 candidate = _SubsampleResultIO._loadSubsampleResult(baseLearner, subsampleResultsDir, candidate)
             objectiveList.append(baseLearner.objective(candidate, sample))
         queue.put((index, objectiveList))
-    except Exception as e:
-        queue.put((index, _ProcessStatus.Error))
-        raise e
-    else:
-        queue.put((index, _ProcessStatus.Finished))
+        exitStatus = _ProcessStatus.Finished
+    finally:
+        queue.put((index, exitStatus))
 
 
 class _CachedEvaluator:
