@@ -279,7 +279,7 @@ class _CachedEvaluator:
 
             for i, objectiveList in enumerate(results):
                 objectiveList = np.asarray(objectiveList, dtype = np.float64)
-                if len(objectiveList) != len(indicesPerProcess[i]) or not np.isfinite(objectiveList).all():
+                if len(objectiveList) != len(pickleableList) or not np.isfinite(objectiveList).all():
                     raise RuntimeError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
                 for j in range(len(indicesPerProcess[i])):
                     self._cachedEvaluation[indicesPerProcess[i][j]] = objectiveList[:, j]
