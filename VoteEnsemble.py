@@ -260,7 +260,7 @@ class _CachedEvaluator:
                     objectiveList.append(self._baseLearner.objective(candidate, self._sample[indicesPerProcess[0]]))
                 objectiveList = np.asarray(objectiveList, dtype = np.float64)
                 if not np.isfinite(objectiveList).all():
-                    raise ValueError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
+                    raise RuntimeError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
                 for i in range(len(indicesPerProcess[0])):
                     self._cachedEvaluation[indicesPerProcess[0][i]] = objectiveList[:, i]
 
@@ -280,7 +280,7 @@ class _CachedEvaluator:
             for i, objectiveList in enumerate(results):
                 objectiveList = np.asarray(objectiveList, dtype = np.float64)
                 if len(objectiveList) != len(indicesPerProcess[i]) or not np.isfinite(objectiveList).all():
-                    raise ValueError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
+                    raise RuntimeError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
                 for j in range(len(indicesPerProcess[i])):
                     self._cachedEvaluation[indicesPerProcess[i][j]] = objectiveList[:, j]
         
@@ -363,8 +363,10 @@ class _BaseVE(metaclass = ABCMeta):
                     chunksize = 1
                 )
             
-            for result in results:
-                for index, learningResult in result:
+            for i in range(len(results)):
+                if len(results[i]) != len(subsampleLists[i]):
+                    raise RuntimeError(f"{self._learnOnSubsamples.__qualname__}: failed to finish learning for all subsamples")
+                for index, learningResult in results[i]:
                     if learningResult is not None:
                         if self._subsampleResultsDir is None:
                             learningResultList[index] = self._baseLearner.fromPickleable(learningResult)
