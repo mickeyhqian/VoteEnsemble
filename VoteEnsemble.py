@@ -1,11 +1,10 @@
 from abc import abstractmethod, ABCMeta
 import numpy as np
 from numpy.typing import NDArray
-from multiprocessing import Process, Queue
+from multiprocessing.pool import Pool
 import pickle
 import os
 from zstandard import ZstdCompressor, ZstdDecompressor
-from enum import Enum
 from typing import List, Any, Tuple, Union
 
 
@@ -183,48 +182,37 @@ class _SubsampleResultIO:
             resultPath = _SubsampleResultIO._subsampleResultPath(subsampleResultsDir, index)
             if os.path.isfile(resultPath):
                 os.remove(resultPath)
-                
-
-class _ProcessStatus(Enum):
-    Created = 0
-    Started = 1
-    Finished = 2
-    Error = 3
 
 
-def _subProcessLearn(baseLearner: BaseLearner, subsampleResultsDir: Union[str, None], sample: NDArray, subsampleList: List[Tuple[int, List[int]]], processID: int, queue: Queue):
-    queue.put((processID, _ProcessStatus.Started))
-    exitStatus = _ProcessStatus.Error
-    try:
-        for index, subsampleIndices in subsampleList:
-            learningResult = baseLearner.learn(sample[subsampleIndices])
-            if learningResult is not None:
-                if subsampleResultsDir is None:
-                    learningResult = baseLearner.toPickleable(learningResult)
-                else:
-                    _SubsampleResultIO._dumpSubsampleResult(baseLearner, learningResult, subsampleResultsDir, index)
-                    learningResult = True
-            queue.put((index, learningResult))
-        exitStatus = _ProcessStatus.Finished
-    finally:
-        queue.put((processID, exitStatus))
-        
-        
-def _subProcessObjective(subsampleResultList: List, baseLearner: BaseLearner, subsampleResultsDir: Union[str, None], sample: NDArray, index: int, queue: Queue):
-    queue.put((index, _ProcessStatus.Started))
-    exitStatus = _ProcessStatus.Error
-    try:
-        objectiveList = []
-        for candidate in subsampleResultList:
+def _subProcessLearn(baseLearner: BaseLearner, 
+                     subsampleResultsDir: Union[str, None], 
+                     sample: NDArray, 
+                     subsampleList: List[Tuple[int, List[int]]]) -> List[Tuple[int, Any]]:
+    results = []
+    for index, subsampleIndices in subsampleList:
+        learningResult = baseLearner.learn(sample[subsampleIndices])
+        if learningResult is not None:
             if subsampleResultsDir is None:
-                candidate = baseLearner.fromPickleable(candidate)
+                learningResult = baseLearner.toPickleable(learningResult)
             else:
-                candidate = _SubsampleResultIO._loadSubsampleResult(baseLearner, subsampleResultsDir, candidate)
-            objectiveList.append(baseLearner.objective(candidate, sample))
-        queue.put((index, objectiveList))
-        exitStatus = _ProcessStatus.Finished
-    finally:
-        queue.put((index, exitStatus))
+                _SubsampleResultIO._dumpSubsampleResult(baseLearner, learningResult, subsampleResultsDir, index)
+                learningResult = True
+        results.append((index, learningResult))
+    return results
+
+
+def _subProcessObjective(subsampleResultList: List, 
+                         baseLearner: BaseLearner, 
+                         subsampleResultsDir: Union[str, None], 
+                         sample: NDArray) -> List[NDArray]:
+    objectiveList = []
+    for candidate in subsampleResultList:
+        if subsampleResultsDir is None:
+            candidate = baseLearner.fromPickleable(candidate)
+        else:
+            candidate = _SubsampleResultIO._loadSubsampleResult(baseLearner, subsampleResultsDir, candidate)
+        objectiveList.append(baseLearner.objective(candidate, sample))
+    return objectiveList
 
 
 class _CachedEvaluator:
@@ -259,7 +247,6 @@ class _CachedEvaluator:
             indicesPerProcess[processIndex].append(index)
             processIndex = (processIndex + 1) % self._numProcesses
         
-        success = True
         if len(indicesPerProcess) <= 1:
             if len(indicesPerProcess) > 0:
                 objectiveList = []
@@ -269,51 +256,29 @@ class _CachedEvaluator:
                     objectiveList.append(self._baseLearner.objective(candidate, self._sample[indicesPerProcess[0]]))
                 objectiveList = np.asarray(objectiveList, dtype = np.float64)
                 if not np.isfinite(objectiveList).all():
-                    success = False
+                    raise ValueError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
                 for i in range(len(indicesPerProcess[0])):
                     self._cachedEvaluation[indicesPerProcess[0][i]] = objectiveList[:, i]
 
         else:
-            queue = Queue()
             if self._subsampleResultsDir is None:
                 pickleableList = [self._baseLearner.toPickleable(candidate) for candidate in self._subsampleResultList]
             else:
                 pickleableList = self._subsampleResultList
-            processList: List[Process] = [
-                Process(
-                    target = _subProcessObjective, 
-                    args = (pickleableList, self._baseLearner, self._subsampleResultsDir, self._sample[indicesPerProcess[i]], i, queue), 
-                    daemon = True
-                ) for i in range(len(indicesPerProcess))
-            ]
-            
-            for process in processList:
-                process.start()
-
-            processStatus = [_ProcessStatus.Created] * len(processList)
-            finished = [False] * len(indicesPerProcess)
-            while any(status != _ProcessStatus.Error and status != _ProcessStatus.Finished for status in processStatus):
-                i, objectiveList = queue.get()
-                if isinstance(objectiveList, _ProcessStatus):
-                    processStatus[i] = objectiveList
-                    if objectiveList == _ProcessStatus.Error:
-                        success = False
-                else:
-                    finished[i] = True
-                    objectiveList = np.asarray(objectiveList, dtype = np.float64)
-                    if not np.isfinite(objectiveList).all():
-                        success = False
-                    for j in range(len(indicesPerProcess[i])):
-                        self._cachedEvaluation[indicesPerProcess[i][j]] = objectiveList[:, j]
-
-            for process in processList:
-                process.join()
                 
-            if success and not all(finished):
-                success = False
-                
-        if not success:
-            raise ValueError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
+            with Pool(len(indicesPerProcess)) as pool:
+                results = pool.starmap(
+                    _subProcessObjective,
+                    [(pickleableList, self._baseLearner, self._subsampleResultsDir, self._sample[indices]) for indices in indicesPerProcess],
+                    chunksize = 1
+                )
+
+            for i, objectiveList in enumerate(results):
+                objectiveList = np.asarray(objectiveList, dtype = np.float64)
+                if not np.isfinite(objectiveList).all():
+                    raise ValueError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
+                for j in range(len(indicesPerProcess[i])):
+                    self._cachedEvaluation[indicesPerProcess[i][j]] = objectiveList[:, j]
         
         evalOutputList = []
         for subsample in subsampleLists:
@@ -387,32 +352,20 @@ class _BaseVE(metaclass = ABCMeta):
                         learningResult = index
                     learningResultList[index] = learningResult
         else:
-            queue = Queue()
-            processList: List[Process] = [
-                Process(
-                    target = _subProcessLearn, 
-                    args = (self._baseLearner, self._subsampleResultsDir, sample, subsampleLists[i], i, queue), 
-                    daemon = True
-                ) for i in range(len(subsampleLists))
-            ]
+            with Pool(len(subsampleLists)) as pool:
+                results = pool.starmap(
+                    _subProcessLearn, 
+                    [(self._baseLearner, self._subsampleResultsDir, sample, subsampleList) for subsampleList in subsampleLists], 
+                    chunksize = 1
+                )
             
-            for process in processList:
-                process.start()
-
-            processStatus = [_ProcessStatus.Created] * len(processList)
-            while any(status != _ProcessStatus.Error and status != _ProcessStatus.Finished for status in processStatus):
-                index, learningResult = queue.get()
-                if isinstance(learningResult, _ProcessStatus):
-                    processStatus[index] = learningResult
-                else:
+            for result in results:
+                for index, learningResult in result:
                     if learningResult is not None:
                         if self._subsampleResultsDir is None:
                             learningResultList[index] = self._baseLearner.fromPickleable(learningResult)
                         else:
                             learningResultList[index] = index
-
-            for process in processList:
-                process.join()
 
         return [entry for entry in learningResultList if entry is not None]
         
