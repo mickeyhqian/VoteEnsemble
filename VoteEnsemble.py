@@ -189,16 +189,18 @@ def _subProcessLearn(baseLearner: BaseLearner,
                      sample: NDArray, 
                      subsampleList: List[Tuple[int, List[int]]]) -> List[Tuple[int, Any]]:
     results = []
-    for index, subsampleIndices in subsampleList:
-        learningResult = baseLearner.learn(sample[subsampleIndices])
-        if learningResult is not None:
-            if subsampleResultsDir is None:
-                learningResult = baseLearner.toPickleable(learningResult)
-            else:
-                _SubsampleResultIO._dumpSubsampleResult(baseLearner, learningResult, subsampleResultsDir, index)
-                learningResult = True
-        results.append((index, learningResult))
-    return results
+    try:
+        for index, subsampleIndices in subsampleList:
+            learningResult = baseLearner.learn(sample[subsampleIndices])
+            if learningResult is not None:
+                if subsampleResultsDir is None:
+                    learningResult = baseLearner.toPickleable(learningResult)
+                else:
+                    _SubsampleResultIO._dumpSubsampleResult(baseLearner, learningResult, subsampleResultsDir, index)
+                    learningResult = True
+            results.append((index, learningResult))
+    finally:
+        return results
 
 
 def _subProcessObjective(subsampleResultList: List, 
@@ -206,13 +208,15 @@ def _subProcessObjective(subsampleResultList: List,
                          subsampleResultsDir: Union[str, None], 
                          sample: NDArray) -> List[NDArray]:
     objectiveList = []
-    for candidate in subsampleResultList:
-        if subsampleResultsDir is None:
-            candidate = baseLearner.fromPickleable(candidate)
-        else:
-            candidate = _SubsampleResultIO._loadSubsampleResult(baseLearner, subsampleResultsDir, candidate)
-        objectiveList.append(baseLearner.objective(candidate, sample))
-    return objectiveList
+    try:
+        for candidate in subsampleResultList:
+            if subsampleResultsDir is None:
+                candidate = baseLearner.fromPickleable(candidate)
+            else:
+                candidate = _SubsampleResultIO._loadSubsampleResult(baseLearner, subsampleResultsDir, candidate)
+            objectiveList.append(baseLearner.objective(candidate, sample))
+    finally:
+        return objectiveList
 
 
 class _CachedEvaluator:
@@ -275,7 +279,7 @@ class _CachedEvaluator:
 
             for i, objectiveList in enumerate(results):
                 objectiveList = np.asarray(objectiveList, dtype = np.float64)
-                if not np.isfinite(objectiveList).all():
+                if len(objectiveList) != len(indicesPerProcess[i]) or not np.isfinite(objectiveList).all():
                     raise ValueError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
                 for j in range(len(indicesPerProcess[i])):
                     self._cachedEvaluation[indicesPerProcess[i][j]] = objectiveList[:, j]
