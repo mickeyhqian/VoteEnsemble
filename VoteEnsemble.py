@@ -24,6 +24,7 @@ class BaseLearner(metaclass = ABCMeta):
 
         Returns:
             A learning result of any type, e.g., a solution scalar/vector (for optimization problems) or a machine learning model (for machine learning problems).
+            Must be pickleable for parallel learning, as well as for dumping to or loading from files.
         """
         pass
 
@@ -86,40 +87,6 @@ class BaseLearner(metaclass = ABCMeta):
         Invoked in ROVE only.
         """
         pass
-
-    def toPickleable(self, learningResult: Any) -> Any:
-        """
-        Transforms a learning result to a pickleable object (e.g., basic python types).
-
-        Invoked only if parallel learning/evaluation is enabled or subsampleResultsDir is provided in MoVE/ROVE.
-
-        The default implementation directly returns learningResult, and is to be overridden if learningResult is not pickleable.
-
-        Args:
-            learningResult: 
-                A learning result output by self.learn.
-
-        Returns:
-            A pickleable representation of the learning result.
-        """
-        return learningResult
-
-    def fromPickleable(self, pickleableLearningResult: Any) -> Any:
-        """
-        The inverse of toPickleable.
-
-        Invoked only if parallel learning/evaluation is enabled or subsampleResultsDir is provided in MoVE/ROVE.
-
-        The default implementation directly returns pickleableLearningResult, and is to be overridden accordingly if toPickleable is overridden.
-
-        Args:
-            pickleableLearningResult: 
-                A pickleable representation of a learning result output by self.learn.
-
-        Returns:
-            A learning result.
-        """
-        return pickleableLearningResult
     
     def dumpLearningResult(self, learningResult: Any, destFile: str):
         """
@@ -131,7 +98,7 @@ class BaseLearner(metaclass = ABCMeta):
             destFile: 
                 Path of a file to dump the learning result into.
         """
-        result = pickle.dumps(self.toPickleable(learningResult))
+        result = pickle.dumps(learningResult)
         compressor = ZstdCompressor()
         result = compressor.compress(result)
         with open(destFile, "wb") as f:
@@ -152,7 +119,7 @@ class BaseLearner(metaclass = ABCMeta):
             result = f.read()
         decompressor = ZstdDecompressor()
         result = decompressor.decompress(result)
-        return self.fromPickleable(pickle.loads(result))
+        return pickle.loads(result)
 
 
 class _SubsampleResultIO:
@@ -192,12 +159,9 @@ def _subProcessLearn(baseLearner: BaseLearner,
     try:
         for index, subsampleIndices in subsampleList:
             learningResult = baseLearner.learn(sample[subsampleIndices])
-            if learningResult is not None:
-                if subsampleResultsDir is None:
-                    learningResult = baseLearner.toPickleable(learningResult)
-                else:
-                    _SubsampleResultIO._dumpSubsampleResult(baseLearner, learningResult, subsampleResultsDir, index)
-                    learningResult = True
+            if learningResult is not None and subsampleResultsDir is not None:
+                _SubsampleResultIO._dumpSubsampleResult(baseLearner, learningResult, subsampleResultsDir, index)
+                learningResult = True
             results.append((index, learningResult))
     finally:
         return results
@@ -210,9 +174,7 @@ def _subProcessObjective(subsampleResultList: List,
     objectiveList = []
     try:
         for candidate in subsampleResultList:
-            if subsampleResultsDir is None:
-                candidate = baseLearner.fromPickleable(candidate)
-            else:
+            if subsampleResultsDir is not None:
                 candidate = _SubsampleResultIO._loadSubsampleResult(baseLearner, subsampleResultsDir, candidate)
             objectiveList.append(baseLearner.objective(candidate, sample))
     finally:
@@ -265,21 +227,16 @@ class _CachedEvaluator:
                     self._cachedEvaluation[indicesPerProcess[0][i]] = objectiveList[:, i]
 
         else:
-            if self._subsampleResultsDir is None:
-                pickleableList = [self._baseLearner.toPickleable(candidate) for candidate in self._subsampleResultList]
-            else:
-                pickleableList = self._subsampleResultList
-                
             with Pool(len(indicesPerProcess)) as pool:
                 results = pool.starmap(
                     _subProcessObjective,
-                    [(pickleableList, self._baseLearner, self._subsampleResultsDir, self._sample[indices]) for indices in indicesPerProcess],
+                    [(self._subsampleResultList, self._baseLearner, self._subsampleResultsDir, self._sample[indices]) for indices in indicesPerProcess],
                     chunksize = 1
                 )
 
             for i, objectiveList in enumerate(results):
                 objectiveList = np.asarray(objectiveList, dtype = np.float64)
-                if len(objectiveList) != len(pickleableList) or not np.isfinite(objectiveList).all():
+                if len(objectiveList) != len(self._subsampleResultList) or not np.isfinite(objectiveList).all():
                     raise RuntimeError(f"{self._evaluateSubsamples.__qualname__}: failed to evaluate all the objective values")
                 for j in range(len(indicesPerProcess[i])):
                     self._cachedEvaluation[indicesPerProcess[i][j]] = objectiveList[:, j]
@@ -369,7 +326,7 @@ class _BaseVE(metaclass = ABCMeta):
                 for index, learningResult in results[i]:
                     if learningResult is not None:
                         if self._subsampleResultsDir is None:
-                            learningResultList[index] = self._baseLearner.fromPickleable(learningResult)
+                            learningResultList[index] = learningResult
                         else:
                             learningResultList[index] = index
 
