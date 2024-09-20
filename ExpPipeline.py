@@ -26,8 +26,8 @@ class GracefulKiller:
 
     @classmethod
     def setup(cls, killFile: str):
-        signal.signal(signal.SIGINT, cls.kill)
-        signal.signal(signal.SIGTERM, cls.kill)
+        # signal.signal(signal.SIGINT, cls.kill)
+        # signal.signal(signal.SIGTERM, cls.kill)
         cls._killFile = killFile
         if len(cls._killFile) > 0:
             open(cls._killFile, "w").close()
