@@ -499,7 +499,11 @@ def plotAvgWithError(baseObjList: List,
         def getMin(objAvg: NDArray, objError: NDArray):
             if len(objAvg) > 0:
                 lb = objAvg - objError
-                return min(objAvg.min(), lb[lb > 0].min())
+                posIndicator = lb > 0
+                if posIndicator.any():
+                    return min(objAvg.min(), lb[posIndicator].min())
+                else:
+                    return objAvg.min()
             return float("inf")
         
         globalMin = float("inf")
