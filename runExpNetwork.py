@@ -67,7 +67,7 @@ if __name__ == "__main__":
         with Pool(14) as pool:
             results = pool.starmap(
                 evaluateObjective,
-                [(network, learningResult, evalSample[i:i + interval]) for i in range(0, len(evalSample), interval)],
+                [(network, learningResult, evalSample[i:min(len(evalSample), i + interval)]) for i in range(0, len(evalSample), interval)],
                 chunksize = 1
             )
         return np.mean(np.concatenate(results))

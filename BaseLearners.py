@@ -425,7 +425,7 @@ class BaseNetwork(BaseLearner):
         interval = len(sample) // numBlocks + 1
         output = []
         for i in range(0, len(sample), interval):
-            output.append(self._objective(learningResult, sample[i:i + interval]))
+            output.append(self._objective(learningResult, sample[i:min(len(sample), i + interval)]))
         return np.concatenate(output)
 
     def _objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
