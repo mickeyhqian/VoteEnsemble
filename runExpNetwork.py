@@ -61,10 +61,11 @@ if __name__ == "__main__":
     evalSample = sampler(100000, -1, rngEval)
 
     network = BaseNetwork(C, Q_sp, Q_pc, R, M, H)
+    numParallel = 14
     
     def evaluator(learningResult: NDArray, repIdx: int) -> float:
-        interval = max(1, len(evalSample) // 14 + 1)
-        with Pool(14) as pool:
+        interval = max(1, len(evalSample) // numParallel + 1)
+        with Pool(numParallel) as pool:
             results = pool.starmap(
                 evaluateObjective,
                 [(network, learningResult, evalSample[i:min(len(evalSample), i + interval)]) for i in range(0, len(evalSample), interval)],
@@ -91,5 +92,5 @@ if __name__ == "__main__":
              k12List, 
              B12List, 
              numReplicates, 
-             numParallelLearn = 14, 
-             numParallelEval = 14)
+             numParallelLearn = numParallel, 
+             numParallelEval = numParallel)
