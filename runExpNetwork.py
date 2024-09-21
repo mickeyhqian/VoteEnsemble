@@ -2,7 +2,6 @@ from BaseLearners import BaseNetwork
 from ExpPipeline import pipeline
 import numpy as np
 from numpy.typing import NDArray
-from multiprocessing import set_start_method
 from scipy import stats
 from uuid import uuid4
 import sys
@@ -13,7 +12,6 @@ logger = logging.getLogger(name = "VE")
 
 
 if __name__ == "__main__":
-    # set_start_method("spawn")
     if len(sys.argv) > 1:
         resultDir = sys.argv[1]
     else:
@@ -62,10 +60,12 @@ if __name__ == "__main__":
     def evaluator(learningResult: NDArray, repIdx: int) -> float:
         return np.mean(network.objective(learningResult, evalSample))
 
-    sampleSizeList = [2**i for i in range(8, 15)]
+    sampleSizeList = [2**i for i in range(7, 12)]
     kList = [(10, 0.005)]
+    # kList = [(10, 0.1)]
     BList = [200]
     k12List = [((10, 0.005), (10, 0.005))]
+    k12List = [((10, 0.1), (10, 0.1))]
     B12List = [(20, 200)]
     numReplicates = 200
     

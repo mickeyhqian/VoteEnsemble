@@ -2,7 +2,6 @@ from BaseLearners import BaseLR
 from ExpPipeline import pipeline
 import numpy as np
 from numpy.typing import NDArray
-from multiprocessing import set_start_method
 from scipy import stats
 from sklearn.linear_model import LinearRegression
 from uuid import uuid4
@@ -14,8 +13,6 @@ logger = logging.getLogger(name = "VE")
 
 
 if __name__ == "__main__":
-    set_start_method("spawn")
-
     if len(sys.argv) > 1:
         resultDir = sys.argv[1]
     else:

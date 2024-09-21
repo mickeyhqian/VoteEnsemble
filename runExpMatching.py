@@ -27,6 +27,7 @@ if __name__ == "__main__":
     N = 5
     randomN = 3
     epsilon = 0
+    # epsilon = 0.25
     w = {
         (0, 0): 1.8865364093012886,
         (0, 1): 2.398555301120877,
@@ -78,7 +79,7 @@ if __name__ == "__main__":
 
     matching = BaseMatching(w, N, randomN, epsilon)
 
-    sampleSizeList = [2**i for i in range(8, 15)]
+    sampleSizeList = [2**i for i in range(10, 16)]
     kList = [(10, 0.005)]
     BList = [200]
     k12List = [((10, 0.005), (10, 0.005))]

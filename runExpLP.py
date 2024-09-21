@@ -23,7 +23,7 @@ if __name__ == "__main__":
     formatter = logging.Formatter(fmt = "%(asctime)s - %(levelname)s - %(message)s")
     logHandler.setFormatter(formatter)
     logger.addHandler(logHandler)
-    
+        
     N = 8
     A = np.ones((N, N))
     w = {
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     lp = BaseLP(A)
 
-    sampleSizeList = [2**i for i in range(8, 15)]
+    sampleSizeList = [2**i for i in range(10, 16)]
     kList = [(10, 0.005)]
     BList = [200]
     k12List = [((10, 0.005), (10, 0.005))]
