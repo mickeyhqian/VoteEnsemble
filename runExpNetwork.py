@@ -79,5 +79,5 @@ if __name__ == "__main__":
              k12List, 
              B12List, 
              numReplicates, 
-             numParallelLearn = 10, 
-             numParallelEval = 10)
+             numParallelLearn = 14, 
+             numParallelEval = 14)
