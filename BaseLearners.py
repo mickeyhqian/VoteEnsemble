@@ -419,8 +419,16 @@ class BaseNetwork(BaseLearner):
     
     def isDuplicate(self, result1: NDArray, result2: NDArray) -> bool:
         return np.max(np.abs(result1 - result2)) < 1e-6
-
+    
     def objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
+        numBlocks = max(1, len(sample) // 500)
+        interval = len(sample) // numBlocks + 1
+        output = []
+        for i in range(0, len(sample), interval):
+            output.append(self._objective(learningResult, sample[i:i + interval]))
+        return np.concatenate(output)
+
+    def _objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
         s, p, g = self._Q_sp.shape
         sampleS = sample[:,:s,:]
         sampleD = sample[:,s:,:]
@@ -430,7 +438,7 @@ class BaseNetwork(BaseLearner):
         y_sp = model.addVars(s, p, g, n, lb = 0, vtype = GRB.CONTINUOUS)
         y_pc = model.addVars(p, c, g, n, lb = 0, vtype = GRB.CONTINUOUS)
         z = model.addVars(c, g, n, lb = 0, vtype = GRB.CONTINUOUS)
-
+        
         obj_expr = 1/n * quicksum(self._Q_sp[i, j, l] * y_sp[i, j, l, a] for i in range(s) for j in range(p) for l in range(g) for a in range(n))\
                         + 1/n * quicksum(self._Q_pc[j, i, l] * y_pc[j, i, l, a] for j in range(p) for i in range(c) for l in range(g) for a in range(n))\
                             + 1/n * quicksum(self._H[i, l] * z[i, l, a] for i in range(c) for l in range(g) for a in range(n))
@@ -448,7 +456,7 @@ class BaseNetwork(BaseLearner):
         
         model.addConstrs((quicksum(self._R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(s)) for l in range(g)) <= self._M[j] * learningResult[j]
                             for a in range(n) for j in range(p)), name="capacity")
-        
+
         model.setParam(GRB.Param.Threads, 1)
         model.optimize()
 

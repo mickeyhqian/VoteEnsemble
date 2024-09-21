@@ -2,6 +2,7 @@ from BaseLearners import BaseNetwork
 from ExpPipeline import pipeline
 import numpy as np
 from numpy.typing import NDArray
+from multiprocessing.pool import Pool
 from scipy import stats
 from uuid import uuid4
 import sys
@@ -9,6 +10,10 @@ import os
 import logging
 logger = logging.getLogger(name = "VE")
 
+
+
+def evaluateObjective(network: BaseNetwork, learningResult: NDArray, sample: NDArray) -> NDArray:
+    return network.objective(learningResult, sample)
 
 
 if __name__ == "__main__":
@@ -53,12 +58,19 @@ if __name__ == "__main__":
         return np.concatenate((sampleS, sampleD), axis = 1)
     
     rngEval = np.random.default_rng(seed = 777)
-    evalSample = sampler(1000000, -1, rngEval)
+    evalSample = sampler(100000, -1, rngEval)
 
     network = BaseNetwork(C, Q_sp, Q_pc, R, M, H)
     
     def evaluator(learningResult: NDArray, repIdx: int) -> float:
-        return np.mean(network.objective(learningResult, evalSample))
+        interval = max(1, len(evalSample) // 14 + 1)
+        with Pool(14) as pool:
+            results = pool.starmap(
+                evaluateObjective,
+                [(network, learningResult, evalSample[i:i + interval]) for i in range(0, len(evalSample), interval)],
+                chunksize = 1
+            )
+        return np.mean(np.concatenate(results))
 
     sampleSizeList = [2**i for i in range(7, 12)]
     kList = [(10, 0.005)]
