@@ -472,3 +472,291 @@ class BaseNetwork(BaseLearner):
     @property
     def isMinimization(self):
         return True
+    
+    
+class BaseNetwork2(BaseLearner):
+    def __init__(self, s: int, C: NDArray, R: NDArray, M: NDArray, H: NDArray):
+        self._C: NDArray = C.copy()
+        self._R: NDArray = R.copy()
+        self._M: NDArray = M.copy()
+        self._H: NDArray = H.copy()
+        self._s: int = s
+        self._p: int = len(C)
+        self._c: int = len(H)
+        self._g: int = R.shape[1]
+    
+    def learn(self, sample: NDArray) -> Union[NDArray, None]:
+        # input:
+        # C (unit cost for building a facility): p*1 numpy array
+        # Q_sp (unit flow cost): s*p*g numpy array
+        # Q_pc (unit flow cost): p*c*g numpy array
+        # sample_S (supply): k*s*g numpy array
+        # sample_D (demand): k*c*g numpy array
+        # R (unit processing require): p*g numpy array
+        # M (processing capacity): p*1 numpy array
+        # H (multiplier): c*g numpy array
+        # output:
+        # x (open facility): p*1 numpy array
+        # y_sp (flow supplier --> facility): s*p*g*k numpy array 
+        # y_pc (flow facility --> consumer): p*c*g*k numpy array
+        # z (multiplier): c*g*k numpy array
+        k = len(sample)
+        idx = 0
+        Q_sp = sample[:, idx:idx + self._s * self._p * self._g].reshape((k, self._s, self._p, self._g))
+        idx += self._s * self._p * self._g
+        Q_pc = sample[:, idx:idx + self._p * self._c * self._g].reshape((k, self._p, self._c, self._g))
+        idx += self._p * self._c * self._g
+        sampleS = sample[:, idx:idx + self._s * self._g].reshape((k, self._s, self._g))
+        idx += self._s * self._g
+        sampleD = sample[:, idx:idx + self._c * self._g].reshape((k, self._c, self._g))
+        
+        model = Model()
+        model.setParam(GRB.Param.OutputFlag, 0)
+        x = model.addVars(self._p, vtype = GRB.BINARY)
+        y_sp = model.addVars(self._s, self._p, self._g, k, lb = 0, vtype = GRB.CONTINUOUS)
+        y_pc = model.addVars(self._p, self._c, self._g, k, lb = 0, vtype = GRB.CONTINUOUS)
+        z = model.addVars(self._c, self._g, k, lb = 0, vtype = GRB.CONTINUOUS)
+
+        obj_expr = quicksum(self._C[j] * x[j] for j in range(self._p)) \
+                        + 1/k * quicksum(Q_sp[a, i, j, l] * y_sp[i, j, l, a] for i in range(self._s) for j in range(self._p) for l in range(self._g) for a in range(k))\
+                            + 1/k * quicksum(Q_pc[a, j, i, l] * y_pc[j, i, l, a] for j in range(self._p) for i in range(self._c) for l in range(self._g) for a in range(k))\
+                                + 1/k * quicksum(self._H[i, l] * z[i, l, a] for i in range(self._c) for l in range(self._g) for a in range(k))
+        
+        model.setObjective(obj_expr, GRB.MINIMIZE)
+
+        model.addConstrs((quicksum(y_sp[i, j, l, a] for i in range(self._s)) - quicksum(y_pc[j, i, l, a] for i in range(self._c)) == 0 
+                        for a in range(k) for l in range(self._g) for j in range(self._p)), name="flow")
+        
+        model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(self._p)) >= sampleD[a, i, l]
+                        for a in range(k) for l in range(self._g) for i in range(self._c)), name="demand")
+        
+        model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(self._p)) <= sampleS[a, i, l]
+                        for a in range(k) for l in range(self._g) for i in range(self._s)), name="supply")
+        
+        model.addConstrs((quicksum(self._R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(self._s)) for l in range(self._g)) <= self._M[j] * x[j]
+                        for a in range(k) for j in range(self._p)), name="capacity")
+
+        model.setParam(GRB.Param.Threads, 1)
+        model.optimize()
+
+        if model.Status == GRB.OPTIMAL:
+            return np.array([round(x[i].X) for i in range(self._p)], dtype = np.int32)
+    
+    @property
+    def enableDeduplication(self):
+        return True
+    
+    def isDuplicate(self, result1: NDArray, result2: NDArray) -> bool:
+        return np.max(np.abs(result1 - result2)) < 1e-6
+    
+    def objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
+        numBlocks = max(1, len(sample) // 500)
+        interval = len(sample) // numBlocks + 1
+        output = []
+        for i in range(0, len(sample), interval):
+            output.append(self._objective(learningResult, sample[i:min(len(sample), i + interval)]))
+        return np.concatenate(output)
+
+    def _objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
+        n = len(sample)
+        idx = 0
+        Q_sp = sample[:, idx:idx + self._s * self._p * self._g].reshape((n, self._s, self._p, self._g))
+        idx += self._s * self._p * self._g
+        Q_pc = sample[:, idx:idx + self._p * self._c * self._g].reshape((n, self._p, self._c, self._g))
+        idx += self._p * self._c * self._g
+        sampleS = sample[:, idx:idx + self._s * self._g].reshape((n, self._s, self._g))
+        idx += self._s * self._g
+        sampleD = sample[:, idx:idx + self._c * self._g].reshape((n, self._c, self._g))
+        
+        model = Model()
+        model.setParam(GRB.Param.OutputFlag, 0)
+        y_sp = model.addVars(self._s, self._p, self._g, n, lb = 0, vtype = GRB.CONTINUOUS)
+        y_pc = model.addVars(self._p, self._c, self._g, n, lb = 0, vtype = GRB.CONTINUOUS)
+        z = model.addVars(self._c, self._g, n, lb = 0, vtype = GRB.CONTINUOUS)
+        
+        obj_expr = 1/n * quicksum(Q_sp[a, i, j, l] * y_sp[i, j, l, a] for i in range(self._s) for j in range(self._p) for l in range(self._g) for a in range(n))\
+                        + 1/n * quicksum(Q_pc[a, j, i, l] * y_pc[j, i, l, a] for j in range(self._p) for i in range(self._c) for l in range(self._g) for a in range(n))\
+                            + 1/n * quicksum(self._H[i, l] * z[i, l, a] for i in range(self._c) for l in range(self._g) for a in range(n))
+        
+        model.setObjective(obj_expr, GRB.MINIMIZE)
+
+        model.addConstrs((quicksum(y_sp[i, j, l, a] for i in range(self._s)) - quicksum(y_pc[j, i, l, a] for i in range(self._c)) == 0
+                            for a in range(n) for l in range(self._g) for j in range(self._p)), name="flow")
+        
+        model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(self._p)) >= sampleD[a, i, l]
+                            for a in range(n) for l in range(self._g) for i in range(self._c)), name="demand")
+        
+        model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(self._p)) <= sampleS[a, i, l]
+                            for a in range(n) for l in range(self._g) for i in range(self._s)), name="supply")
+        
+        model.addConstrs((quicksum(self._R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(self._s)) for l in range(self._g)) <= self._M[j] * learningResult[j]
+                            for a in range(n) for j in range(self._p)), name="capacity")
+
+        model.setParam(GRB.Param.Threads, 1)
+        model.optimize()
+
+        if model.Status == GRB.OPTIMAL:
+            fixedCost = np.dot(self._C, learningResult)
+            randomCost1 = np.array([sum(Q_sp[a, i, j, l] * y_sp[i, j, l, a].X for i in range(self._s) for j in range(self._p) for l in range(self._g)) for a in range(n)])
+            randomCost2 = np.array([sum(Q_pc[a, j, i, l] * y_pc[j, i, l, a].X for j in range(self._p) for i in range(self._c) for l in range(self._g)) for a in range(n)])
+            randomCost3 = np.array([sum(self._H[i, l] * z[i, l, a].X for i in range(self._c) for l in range(self._g)) for a in range(n)])
+            return randomCost1 + randomCost2 + randomCost3 + fixedCost
+        else:
+            raise RuntimeError("failed to evaluate network second stage")
+
+    @property
+    def isMinimization(self):
+        return True
+    
+    
+class BaseNetwork3(BaseLearner):
+    def __init__(self, s: int, C: NDArray, R: NDArray, H: NDArray):
+        self._C: NDArray = C.copy()
+        self._R: NDArray = R.copy()
+        self._H: NDArray = H.copy()
+        self._s: int = s
+        self._p: int = len(C)
+        self._c: int = len(H)
+        self._g: int = R.shape[1]
+    
+    def learn(self, sample: NDArray) -> Union[NDArray, None]:
+        # input:
+        # C (unit cost for building a facility): p*1 numpy array
+        # Q_sp (unit flow cost): s*p*g numpy array
+        # Q_pc (unit flow cost): p*c*g numpy array
+        # sample_S (supply): k*s*g numpy array
+        # sample_D (demand): k*c*g numpy array
+        # R (unit processing require): p*g numpy array
+        # M (processing capacity): p*1 numpy array
+        # H (multiplier): c*g numpy array
+        # output:
+        # x (open facility): p*1 numpy array
+        # y_sp (flow supplier --> facility): s*p*g*k numpy array 
+        # y_pc (flow facility --> consumer): p*c*g*k numpy array
+        # z (multiplier): c*g*k numpy array
+        
+        # solutions = [
+        #     np.array([0, 0], dtype = np.int32),
+        #     np.array([1, 0], dtype = np.int32),
+        #     np.array([0, 1], dtype = np.int32),
+        #     np.array([1, 1], dtype = np.int32),
+        # ]
+        # values = []
+        # for sol in solutions:
+        #     values.append(np.mean(self.objective(sol, sample)))
+        
+        k = len(sample)
+        idx = 0
+        Q_sp = sample[:, idx:idx + self._s * self._p * self._g].reshape((k, self._s, self._p, self._g))
+        idx += self._s * self._p * self._g
+        Q_pc = sample[:, idx:idx + self._p * self._c * self._g].reshape((k, self._p, self._c, self._g))
+        idx += self._p * self._c * self._g
+        sampleS = sample[:, idx:idx + self._s * self._g].reshape((k, self._s, self._g))
+        idx += self._s * self._g
+        sampleD = sample[:, idx:idx + self._c * self._g].reshape((k, self._c, self._g))
+        idx += self._c * self._g
+        sampleM = sample[:, idx:idx + self._p]
+        
+        model = Model()
+        model.setParam(GRB.Param.OutputFlag, 0)
+        x = model.addVars(self._p, vtype = GRB.BINARY)
+        y_sp = model.addVars(self._s, self._p, self._g, k, lb = 0, vtype = GRB.CONTINUOUS)
+        y_pc = model.addVars(self._p, self._c, self._g, k, lb = 0, vtype = GRB.CONTINUOUS)
+        z = model.addVars(self._c, self._g, k, lb = 0, vtype = GRB.CONTINUOUS)
+
+        obj_expr = quicksum(self._C[j] * x[j] for j in range(self._p)) \
+                        + 1/k * quicksum(Q_sp[a, i, j, l] * y_sp[i, j, l, a] for i in range(self._s) for j in range(self._p) for l in range(self._g) for a in range(k))\
+                            + 1/k * quicksum(Q_pc[a, j, i, l] * y_pc[j, i, l, a] for j in range(self._p) for i in range(self._c) for l in range(self._g) for a in range(k))\
+                                + 1/k * quicksum(self._H[i, l] * z[i, l, a] for i in range(self._c) for l in range(self._g) for a in range(k))
+        
+        model.setObjective(obj_expr, GRB.MINIMIZE)
+
+        model.addConstrs((quicksum(y_sp[i, j, l, a] for i in range(self._s)) - quicksum(y_pc[j, i, l, a] for i in range(self._c)) == 0 
+                        for a in range(k) for l in range(self._g) for j in range(self._p)), name="flow")
+        
+        model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(self._p)) >= sampleD[a, i, l]
+                        for a in range(k) for l in range(self._g) for i in range(self._c)), name="demand")
+        
+        model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(self._p)) <= sampleS[a, i, l]
+                        for a in range(k) for l in range(self._g) for i in range(self._s)), name="supply")
+        
+        model.addConstrs((quicksum(self._R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(self._s)) for l in range(self._g)) <= sampleM[a, j] * x[j]
+                        for a in range(k) for j in range(self._p)), name="capacity")
+
+        model.setParam(GRB.Param.Threads, 1)
+        model.optimize()
+
+        if model.Status == GRB.OPTIMAL:
+            print(model.ObjVal)
+            print([round(x[i].X) for i in range(self._p)])
+            return np.array([round(x[i].X) for i in range(self._p)], dtype = np.int32)
+        # print(values)
+        # return solutions[np.argmin(values)]
+    
+    @property
+    def enableDeduplication(self):
+        return True
+    
+    def isDuplicate(self, result1: NDArray, result2: NDArray) -> bool:
+        return np.max(np.abs(result1 - result2)) < 1e-6
+    
+    def objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
+        numBlocks = max(1, len(sample) // 500)
+        interval = len(sample) // numBlocks + 1
+        output = []
+        for i in range(0, len(sample), interval):
+            output.append(self._objective(learningResult, sample[i:min(len(sample), i + interval)]))
+        return np.concatenate(output)
+
+    def _objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
+        n = len(sample)
+        idx = 0
+        Q_sp = sample[:, idx:idx + self._s * self._p * self._g].reshape((n, self._s, self._p, self._g))
+        idx += self._s * self._p * self._g
+        Q_pc = sample[:, idx:idx + self._p * self._c * self._g].reshape((n, self._p, self._c, self._g))
+        idx += self._p * self._c * self._g
+        sampleS = sample[:, idx:idx + self._s * self._g].reshape((n, self._s, self._g))
+        idx += self._s * self._g
+        sampleD = sample[:, idx:idx + self._c * self._g].reshape((n, self._c, self._g))
+        idx += self._c * self._g
+        sampleM = sample[:, idx:idx + self._p]
+        
+        model = Model()
+        model.setParam(GRB.Param.OutputFlag, 0)
+        y_sp = model.addVars(self._s, self._p, self._g, n, lb = 0, vtype = GRB.CONTINUOUS)
+        y_pc = model.addVars(self._p, self._c, self._g, n, lb = 0, vtype = GRB.CONTINUOUS)
+        z = model.addVars(self._c, self._g, n, lb = 0, vtype = GRB.CONTINUOUS)
+        
+        obj_expr = 1/n * quicksum(Q_sp[a, i, j, l] * y_sp[i, j, l, a] for i in range(self._s) for j in range(self._p) for l in range(self._g) for a in range(n))\
+                        + 1/n * quicksum(Q_pc[a, j, i, l] * y_pc[j, i, l, a] for j in range(self._p) for i in range(self._c) for l in range(self._g) for a in range(n))\
+                            + 1/n * quicksum(self._H[i, l] * z[i, l, a] for i in range(self._c) for l in range(self._g) for a in range(n))
+        
+        model.setObjective(obj_expr, GRB.MINIMIZE)
+
+        model.addConstrs((quicksum(y_sp[i, j, l, a] for i in range(self._s)) - quicksum(y_pc[j, i, l, a] for i in range(self._c)) == 0
+                            for a in range(n) for l in range(self._g) for j in range(self._p)), name="flow")
+        
+        model.addConstrs((quicksum(y_pc[j, i, l, a] + z[i, l, a] for j in range(self._p)) >= sampleD[a, i, l]
+                            for a in range(n) for l in range(self._g) for i in range(self._c)), name="demand")
+        
+        model.addConstrs((quicksum(y_sp[i, j, l, a] for j in range(self._p)) <= sampleS[a, i, l]
+                            for a in range(n) for l in range(self._g) for i in range(self._s)), name="supply")
+        
+        model.addConstrs((quicksum(self._R[j, l] * quicksum(y_sp[i, j, l, a] for i in range(self._s)) for l in range(self._g)) <= sampleM[a, j] * learningResult[j]
+                            for a in range(n) for j in range(self._p)), name="capacity")
+
+        model.setParam(GRB.Param.Threads, 1)
+        model.optimize()
+
+        if model.Status == GRB.OPTIMAL:
+            fixedCost = np.dot(self._C, learningResult)
+            randomCost1 = np.array([sum(Q_sp[a, i, j, l] * y_sp[i, j, l, a].X for i in range(self._s) for j in range(self._p) for l in range(self._g)) for a in range(n)])
+            randomCost2 = np.array([sum(Q_pc[a, j, i, l] * y_pc[j, i, l, a].X for j in range(self._p) for i in range(self._c) for l in range(self._g)) for a in range(n)])
+            randomCost3 = np.array([sum(self._H[i, l] * z[i, l, a].X for i in range(self._c) for l in range(self._g)) for a in range(n)])
+            return randomCost1 + randomCost2 + randomCost3 + fixedCost
+        else:
+            raise RuntimeError("failed to evaluate network second stage")
+
+    @property
+    def isMinimization(self):
+        return True
