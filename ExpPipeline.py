@@ -465,7 +465,8 @@ def pipeline(resultDir: str,
         
         
 default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-
+markers = ["o", "s", "d", "^", "*"]
+lineStyles = ["solid", "dashed", "dashdot", "dotted", (0, (3, 5, 1, 5))]
 
 def plotAvgWithError(baseObjList: List, 
                      MoVEObjList: List,
@@ -525,19 +526,19 @@ def plotAvgWithError(baseObjList: List,
     numLines = 0
     if len(baseObjAvg) > 0:
         numLines += 1
-        ax.errorbar(sampleSizeList, baseObjAvg, yerr = [baseObjAvg - np.maximum(globalMin, baseObjAvg - baseObjError), baseObjError], marker = 'o', markersize = markersize, capsize = 5, color = default_colors[0], linestyle = '-', label = 'base')
+        ax.errorbar(sampleSizeList, baseObjAvg, yerr = [baseObjAvg - np.maximum(globalMin, baseObjAvg - baseObjError), baseObjError], marker = markers[0], markersize = markersize, capsize = 5, color = default_colors[0], linestyle = lineStyles[0], label = 'base')
     if len(MoVEObjAvg) > 0:
         numLines += 1
-        ax.errorbar(np.array(sampleSizeList) * 1.03, MoVEObjAvg, yerr = [MoVEObjAvg - np.maximum(globalMin, MoVEObjAvg - MoVEObjError), MoVEObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[1], linestyle = '--', label = MoVE.__name__)
+        ax.errorbar(np.array(sampleSizeList) * 1.03, MoVEObjAvg, yerr = [MoVEObjAvg - np.maximum(globalMin, MoVEObjAvg - MoVEObjError), MoVEObjError], marker = markers[1], markersize = markersize, capsize = 5, color = default_colors[1], linestyle = lineStyles[1], label = MoVE.__name__)
     if len(ROVEObjAvg) > 0:
         numLines += 1
-        ax.errorbar(np.array(sampleSizeList) * 1.03, ROVEObjAvg, yerr = [ROVEObjAvg - np.maximum(globalMin, ROVEObjAvg - ROVEObjError), ROVEObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[2], linestyle = '--', label = ROVE.__name__)
+        ax.errorbar(np.array(sampleSizeList) * 1.03, ROVEObjAvg, yerr = [ROVEObjAvg - np.maximum(globalMin, ROVEObjAvg - ROVEObjError), ROVEObjError], marker = markers[2], markersize = markersize, capsize = 5, color = default_colors[2], linestyle = lineStyles[2], label = ROVE.__name__)
     if len(ROVEsObjAvg) > 0:
         numLines += 1
-        ax.errorbar(np.array(sampleSizeList) * 1.06, ROVEsObjAvg, yerr = [ROVEsObjAvg - np.maximum(globalMin, ROVEsObjAvg - ROVEsObjError), ROVEsObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[3], linestyle = '--', label = f"{ROVE.__name__}s")
+        ax.errorbar(np.array(sampleSizeList) * 1.06, ROVEsObjAvg, yerr = [ROVEsObjAvg - np.maximum(globalMin, ROVEsObjAvg - ROVEsObjError), ROVEsObjError], marker = markers[3], markersize = markersize, capsize = 5, color = default_colors[3], linestyle = lineStyles[3], label = f"{ROVE.__name__}s")
     if len(baggingObjAvg) > 0:
         numLines += 1
-        ax.errorbar(np.array(sampleSizeList) * 1.09, baggingObjAvg, yerr = [baggingObjAvg - np.maximum(globalMin, baggingObjAvg - baggingObjError), baggingObjError], marker = 's', markersize = markersize, capsize = 5, color = default_colors[4], linestyle = '-.', label = 'Bagging')
+        ax.errorbar(np.array(sampleSizeList) * 1.09, baggingObjAvg, yerr = [baggingObjAvg - np.maximum(globalMin, baggingObjAvg - baggingObjError), baggingObjError], marker = markers[4], markersize = markersize, capsize = 5, color = default_colors[4], linestyle = lineStyles[4], label = 'Bagging')
 
     ax.set_xlabel('sample size', size = 16)
     ax.set_ylabel('cost', size = 16)
@@ -593,27 +594,27 @@ def plotCDF(baseObjList: List,
         numLines += 1
         xList, yList = getCDF(baseObjList)
         minX = min(minX, np.amin(xList))
-        ax.plot(xList, yList, color = default_colors[0], linestyle = '-', label = 'base', linewidth = 2)
+        ax.plot(xList, yList, color = default_colors[0], linestyle = lineStyles[0], label = 'base', linewidth = 2)
     if len(MoVEObjList) > 0:
         numLines += 1
         xList, yList = getCDF(MoVEObjList)
         minX = min(minX, np.amin(xList))
-        ax.plot(xList, yList, color = default_colors[1], linestyle = '-.', label = MoVE.__name__, linewidth = 2)
+        ax.plot(xList, yList, color = default_colors[1], linestyle = lineStyles[1], label = MoVE.__name__, linewidth = 2)
     if len(ROVEObjList) > 0:
         numLines += 1
         xList, yList = getCDF(ROVEObjList)
         minX = min(minX, np.amin(xList))
-        ax.plot(xList, yList, color = default_colors[2], linestyle = '--', label = ROVE.__name__, linewidth = 2)
+        ax.plot(xList, yList, color = default_colors[2], linestyle = lineStyles[2], label = ROVE.__name__, linewidth = 2)
     if len(ROVEsObjList) > 0:
         numLines += 1
         xList, yList = getCDF(ROVEsObjList)
         minX = min(minX, np.amin(xList))
-        ax.plot(xList, yList, color = default_colors[3], linestyle = '--', label = f"{ROVE.__name__}s", linewidth = 2)
+        ax.plot(xList, yList, color = default_colors[3], linestyle = lineStyles[3], label = f"{ROVE.__name__}s", linewidth = 2)
     if len(baggingObjList) > 0:
         numLines += 1
         xList, yList = getCDF(baggingObjList)
         minX = min(minX, np.amin(xList))
-        ax.plot(xList, yList, color = default_colors[4], linestyle = '-.', label = 'Bagging', linewidth = 2)
+        ax.plot(xList, yList, color = default_colors[4], linestyle = lineStyles[4], label = 'Bagging', linewidth = 2)
         
     if numLines == 0:
         return
