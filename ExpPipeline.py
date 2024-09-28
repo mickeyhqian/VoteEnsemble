@@ -467,6 +467,8 @@ def pipeline(resultDir: str,
 default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 markers = ["o", "s", "d", "^", "*"]
 lineStyles = ["solid", "dashed", "dashdot", "dotted", (0, (3, 5, 1, 5))]
+# plt.rcParams['text.usetex'] = True
+# plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
 
 def plotAvgWithError(baseObjList: List, 
                      MoVEObjList: List,
@@ -477,7 +479,6 @@ def plotAvgWithError(baseObjList: List,
                      confidenceLevel: float,
                      sampleSizeList: List, 
                      filePath: str,
-                     xLogScale: bool = True,
                      yLogScale: bool = False):
     def getAvgWithError(objList: List[List[float]]):
         if len(objList) > 0 and len(objList[0]) > 0:
@@ -526,24 +527,23 @@ def plotAvgWithError(baseObjList: List,
     numLines = 0
     if len(baseObjAvg) > 0:
         numLines += 1
-        ax.errorbar(sampleSizeList, baseObjAvg, yerr = [baseObjAvg - np.maximum(globalMin, baseObjAvg - baseObjError), baseObjError], marker = markers[0], markersize = markersize, capsize = 5, color = default_colors[0], linestyle = lineStyles[0], label = 'base')
+        ax.errorbar(sampleSizeList, baseObjAvg, yerr = [baseObjAvg - np.maximum(globalMin, baseObjAvg - baseObjError), baseObjError], marker = markers[0], markersize = markersize, capsize = 3, color = default_colors[0], linestyle = lineStyles[0], label = 'base')
     if len(MoVEObjAvg) > 0:
         numLines += 1
-        ax.errorbar(np.array(sampleSizeList) * 1.03, MoVEObjAvg, yerr = [MoVEObjAvg - np.maximum(globalMin, MoVEObjAvg - MoVEObjError), MoVEObjError], marker = markers[1], markersize = markersize, capsize = 5, color = default_colors[1], linestyle = lineStyles[1], label = MoVE.__name__)
+        ax.errorbar(np.array(sampleSizeList) * 1.02, MoVEObjAvg, yerr = [MoVEObjAvg - np.maximum(globalMin, MoVEObjAvg - MoVEObjError), MoVEObjError], marker = markers[1], markersize = markersize, capsize = 3, color = default_colors[1], linestyle = lineStyles[1], label = MoVE.__name__)
     if len(ROVEObjAvg) > 0:
         numLines += 1
-        ax.errorbar(np.array(sampleSizeList) * 1.03, ROVEObjAvg, yerr = [ROVEObjAvg - np.maximum(globalMin, ROVEObjAvg - ROVEObjError), ROVEObjError], marker = markers[2], markersize = markersize, capsize = 5, color = default_colors[2], linestyle = lineStyles[2], label = ROVE.__name__)
+        ax.errorbar(np.array(sampleSizeList) * 1.04, ROVEObjAvg, yerr = [ROVEObjAvg - np.maximum(globalMin, ROVEObjAvg - ROVEObjError), ROVEObjError], marker = markers[2], markersize = markersize, capsize = 3, color = default_colors[2], linestyle = lineStyles[2], label = ROVE.__name__)
     if len(ROVEsObjAvg) > 0:
         numLines += 1
-        ax.errorbar(np.array(sampleSizeList) * 1.06, ROVEsObjAvg, yerr = [ROVEsObjAvg - np.maximum(globalMin, ROVEsObjAvg - ROVEsObjError), ROVEsObjError], marker = markers[3], markersize = markersize, capsize = 5, color = default_colors[3], linestyle = lineStyles[3], label = f"{ROVE.__name__}s")
+        ax.errorbar(np.array(sampleSizeList) * 1.06, ROVEsObjAvg, yerr = [ROVEsObjAvg - np.maximum(globalMin, ROVEsObjAvg - ROVEsObjError), ROVEsObjError], marker = markers[3], markersize = markersize, capsize = 3, color = default_colors[3], linestyle = lineStyles[3], label = f"{ROVE.__name__}s")
     if len(baggingObjAvg) > 0:
         numLines += 1
-        ax.errorbar(np.array(sampleSizeList) * 1.09, baggingObjAvg, yerr = [baggingObjAvg - np.maximum(globalMin, baggingObjAvg - baggingObjError), baggingObjError], marker = markers[4], markersize = markersize, capsize = 5, color = default_colors[4], linestyle = lineStyles[4], label = 'Bagging')
+        ax.errorbar(np.array(sampleSizeList) * 1.08, baggingObjAvg, yerr = [baggingObjAvg - np.maximum(globalMin, baggingObjAvg - baggingObjError), baggingObjError], marker = markers[4], markersize = markersize, capsize = 3, color = default_colors[4], linestyle = lineStyles[4], label = 'Bagging')
 
     ax.set_xlabel('sample size', size = 16)
     ax.set_ylabel('cost', size = 16)
-    if xLogScale:
-        ax.set_xscale('log')
+    ax.set_xscale('log', base = 2)
     if yLogScale:
         ax.set_yscale('log')
     ax.tick_params(axis='x', labelsize=14)
@@ -554,7 +554,7 @@ def plotAvgWithError(baseObjList: List,
     
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     os.makedirs(os.path.dirname(filePath), exist_ok = True)
-    fig.savefig(filePath, dpi = 500)
+    fig.savefig(filePath, dpi = 500, bbox_inches = 'tight')
 
 def plotCDF(baseObjList: List, 
             MoVEObjList: List,
@@ -636,4 +636,4 @@ def plotCDF(baseObjList: List,
     # fig.legend(handles, labels, loc = 'upper center', bbox_to_anchor = (0.5, 0.95), fontsize = 'small')
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     os.makedirs(os.path.dirname(filePath), exist_ok = True)
-    fig.savefig(filePath, dpi = 500)
+    fig.savefig(filePath, dpi = 500, bbox_inches = 'tight')
