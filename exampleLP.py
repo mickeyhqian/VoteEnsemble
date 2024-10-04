@@ -48,25 +48,25 @@ if __name__ == "__main__":
     d = 10
     lb = np.zeros(d)
     ub = np.full(d, np.inf)
-    rngLP = np.random.default_rng(seed=999)
+    rngLP = np.random.default_rng(seed = 999)
     A = rngLP.uniform(low=0, high=1, size=(5, d))
     b = 10 * np.ones(5)
     lp = BaseLP(A, b, lb, ub)
 
     c = -rngLP.uniform(low=0, high=1, size=d)
     sample = rngData.normal(loc = c, size = (10000, len(c)))
+    
+    optimalVal = np.dot(c, lp.learn([c]))
+    print(f"True optimal objective value = {optimalVal}")
 
     moveLP = MoVE(lp, randomState = 666, numParallelLearn = 4)
-    tic = time.time()
-    output = moveLP.run(sample, 500, 200)
-    print(f"{MoVE.__name__} outputs the solution: ", output)
+    output = moveLP.run(sample)
+    print(f"{MoVE.__name__} outputs the solution: {output}, objective value = {np.dot(c, output)}")
 
     roveLP = ROVE(lp, False, randomState = 666, numParallelLearn = 4)
-    tic = time.time()
-    output = roveLP.run(sample, 1000, 500, 50, 200)
-    print(f"{ROVE.__name__} outputs the solution: ", output)
+    output = roveLP.run(sample)
+    print(f"{ROVE.__name__} outputs the solution: {output}, objective value = {np.dot(c, output)}")
 
     rovesLP = ROVE(lp, True, randomState = 666, numParallelLearn = 4)
-    tic = time.time()
-    output = rovesLP.run(sample, 1000, 500, 50, 200)
-    print(f"{ROVE.__name__}s outputs the solution: ", output)
+    output = rovesLP.run(sample)
+    print(f"{ROVE.__name__}s outputs the solution: {output}, objective value = {np.dot(c, output)}")
