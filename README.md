@@ -6,7 +6,7 @@ This repository contains the python code for the paper ''Subsampled Ensemble Can
 ## Installation
 1.&nbsp;cd to the root directory, i.e., VoteEnsemble,  of this repository.
 
-2.&nbsp;Install the required dependencies, *setuptools*, *numpy*, *zstandard*, if not already intalled. You can install them directly with
+2.&nbsp;Install the required dependencies, `setuptools`, `numpy` and `zstandard`, if not already intalled. You can install them directly with
 ```
 pip install setuptools numpy zstandard
 ```
@@ -20,7 +20,7 @@ pip install -r requirements.txt
 pip install .
 ```
 ## Quick Start
-To use VoteEnsemble, you need to define a base learning algorithm by subclassing the BaseLearner class. Below are two simple use cases to illustrate this.
+To use VoteEnsemble, you need to define a base learning algorithm by subclassing the `BaseLearner` class defined in `VoteEnsemble.py`. Below are two simple use cases to illustrate this.
 ### Linear regression
 Consider a linear regression
 <!-- $$
@@ -29,7 +29,7 @@ $$ -->
 
 ![Equation](./images/LR.png)
 
-where $X$ is the input vector, $Y$ is the response variable, and $\theta$ is the model parameter vector. The script exampleLR.py implements such an example, where the method of least squares is the base learning algorithm, and applies $\mathsf{ROVE}$ and $\mathsf{ROVEs}$ to learn the model parameters. Try the example by running (*scikit-learn* required)
+where $X$ is the input vector, $Y$ is the response variable, and $\theta$ is the model parameter vector. The script `exampleLR.py` implements such an example, where the method of least squares is the base learning algorithm, and applies $\mathsf{ROVE}$ and $\mathsf{ROVEs}$ to learn the model parameters. Try the example by running (`scikit-learn` required)
 ```
 python exampleLR.py
 ```
@@ -55,7 +55,7 @@ $$ -->
 
 ![Equation](./images/LP.png)
 
-where $z$ is the random coefficient vector, $A$ is the constraint matrix, $b$ is the right hand side, and $l,u$ are lower and upper bounds of the decison $\theta$. The script exampleLP.py implements such an example, where the sample average approximation is the base learning algorithm, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running (*cvxpy* required)
+where $z$ is the random coefficient vector, $A$ is the constraint matrix, $b$ is the right hand side, and $l,u$ are lower and upper bounds of the decison $\theta$. The script `exampleLP.py` implements such an example, where the sample average approximation is the base learning algorithm, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running (`cvxpy` required)
 ```
 python exampleLP.py
 ```
