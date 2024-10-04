@@ -45,10 +45,12 @@ if __name__ == "__main__":
 
     # skip MoVE as lr.enableDeduplication() == False
     
+    print(f"True model parameters = {beta}")
+    
     roveLR = ROVE(lr, False, randomState = 666)
     output = roveLR.run(sample)
-    print(f"{ROVE.__name__} outputs the parameters: ", output.coef_)
+    print(f"{ROVE.__name__} outputs the parameters: {output.coef_}")
 
     rovesLR = ROVE(lr, True, randomState = 666)
     output = rovesLR.run(sample)
-    print(f"{ROVE.__name__}s outputs the parameters: ", output.coef_)
+    print(f"{ROVE.__name__}s outputs the parameters: {output.coef_}")
