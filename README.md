@@ -20,7 +20,7 @@ pip install -r requirements.txt
 pip install .
 ```
 ## Quick Start
-To use VoteEnsemble, you first need to define a base learning algorithm by subclassing the BaseLearner class. Below are two simple use cases to illustrate this.
+To use VoteEnsemble, you need to define a base learning algorithm by subclassing the BaseLearner class. Below are two simple use cases to illustrate this.
 ### Linear regression
 Consider a linear regression
 <!-- $$
