@@ -48,9 +48,9 @@ if __name__ == "__main__":
     roveLR = ROVE(lr, False, randomState = 666)
     tic = time.time()
     output = roveLR.run(sample, 1000, 500, 50, 200)
-    print(f"{ROVE.__name__} took {time.time() - tic} secs, result: ", output.coef_)
+    print(f"{ROVE.__name__} outputs the parameters: ", output.coef_)
 
     rovesLR = ROVE(lr, True, randomState = 666)
     tic = time.time()
     output = rovesLR.run(sample, 1000, 500, 50, 200)
-    print(f"{ROVE.__name__}s took {time.time() - tic} secs, result: ", output.coef_)
+    print(f"{ROVE.__name__}s outputs the parameters: ", output.coef_)

@@ -59,14 +59,14 @@ if __name__ == "__main__":
     moveLP = MoVE(lp, randomState = 666, numParallelLearn = 4)
     tic = time.time()
     output = moveLP.run(sample, 500, 200)
-    print(f"{MoVE.__name__} took {time.time() - tic} secs, result: ", output)
+    print(f"{MoVE.__name__} outputs the solution: ", output)
 
     roveLP = ROVE(lp, False, randomState = 666, numParallelLearn = 4)
     tic = time.time()
     output = roveLP.run(sample, 1000, 500, 50, 200)
-    print(f"{ROVE.__name__} took {time.time() - tic} secs, result: ", output)
+    print(f"{ROVE.__name__} outputs the solution: ", output)
 
     rovesLP = ROVE(lp, True, randomState = 666, numParallelLearn = 4)
     tic = time.time()
     output = rovesLP.run(sample, 1000, 500, 50, 200)
-    print(f"{ROVE.__name__}s took {time.time() - tic} secs, result: ", output)
+    print(f"{ROVE.__name__}s outputs the solution: ", output)
