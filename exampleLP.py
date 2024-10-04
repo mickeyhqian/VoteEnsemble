@@ -57,16 +57,13 @@ if __name__ == "__main__":
     sample = rngData.normal(loc = c, size = (10000, len(c)))
 
     moveLP = MoVE(lp, randomState = 666, numParallelLearn = 4)
-    tic = time.time()
-    output = moveLP.run(sample, 500, 200)
+    output = moveLP.run(sample)
     print(f"{MoVE.__name__} outputs the solution: ", output)
 
     roveLP = ROVE(lp, False, randomState = 666, numParallelLearn = 4)
-    tic = time.time()
-    output = roveLP.run(sample, 1000, 500, 50, 200)
+    output = roveLP.run(sample)
     print(f"{ROVE.__name__} outputs the solution: ", output)
 
     rovesLP = ROVE(lp, True, randomState = 666, numParallelLearn = 4)
-    tic = time.time()
-    output = rovesLP.run(sample, 1000, 500, 50, 200)
+    output = rovesLP.run(sample)
     print(f"{ROVE.__name__}s outputs the solution: ", output)

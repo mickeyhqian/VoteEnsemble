@@ -351,7 +351,7 @@ class MoVE(_BaseVE):
         if not self._baseLearner.enableDeduplication:
             raise ValueError(f"{self.__class__.__name__} does not accept base learners with enableDeduplication = False")
 
-    def run(self, sample: NDArray, k: int, B: int) -> Any:
+    def run(self, sample: NDArray, k: Union[int, None] = None, B: int = 200) -> Any:
         """
         Run MoVE on the base learner.
 
@@ -359,15 +359,20 @@ class MoVE(_BaseVE):
             sample: 
                 A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
             k: 
-                Subsample size.
+                Subsample size. If None, k is set to min(max(30, len(sample) // 200), len(sample)).
             B: 
-                Number of subsamples to draw.
+                Number of subsamples to draw. Default 200. If k >= len(sample), B is reset to 1.
 
         Returns:
             A learning result.
         """
         if self._subsampleResultsDir is not None:
             _SubsampleResultIO._prepareSubsampleResultDir(self._subsampleResultsDir)
+            
+        if k is None:
+            k = min(max(30, len(sample) // 200), len(sample))
+        if k >= len(sample):
+            B = 1
 
         learningResults = self._learnOnSubsamples(np.asarray(sample), k, B)
 
@@ -478,7 +483,7 @@ class ROVE(_BaseVE):
             gapMatrix = bestObj - evalArray
         return gapMatrix
 
-    def run(self, sample: NDArray, k1: int, k2: int, B1: int, B2: int, epsilon: float = -1.0, autoEpsilonProb: float = 0.5) -> Any:
+    def run(self, sample: NDArray, k1: Union[int, None] = None, k2: Union[int, None] = None, B1: int = 50, B2: int = 200, epsilon: float = -1.0, autoEpsilonProb: float = 0.5) -> Any:
         """
         Run ROVE (self._dataSplit = False) or ROVEs (self._dataSplit = True) on the base learner.
 
@@ -486,13 +491,14 @@ class ROVE(_BaseVE):
             sample: 
                 A numpy array of training data, where each sample[i] for i in range(len(sample)) is a data point.
             k1: 
-                Subsample size for the model candidate retrieval phase.
+                Subsample size for the model candidate retrieval phase. If None, k1 is set to min(max(30, n1 // 200), n1) if self._baseLearner.enableDeduplication is True, otherwise min(max(30, n1 // 2), n1), 
+                where n1 = len(sample) for ROVE and len(sample) // 2 for ROVEs.
             k2: 
-                Subsample size for the voting phase.
+                Subsample size for the voting phase. If None, k2 is set to min(max(30, n2 // 200), n2), where n2 = len(sample) for ROVE and len(sample) - len(sample) // 2 for ROVEs.
             B1: 
-                Number of subsamples to draw in the model candidate retrieval phase.
+                Number of subsamples to draw in the model candidate retrieval phase. Default 50. If k1 >= n1, B1 is reset to 1.
             B2: 
-                Number of subsamples to draw in the voting phase.
+                Number of subsamples to draw in the voting phase. Default 200. If k2 >= n2, B2 is reset to 1.
             epsilon: 
                 The suboptimality threshold. Any value < 0 leads to auto-selection. Default -1.0.
             autoEpsilonProb: 
@@ -502,19 +508,30 @@ class ROVE(_BaseVE):
             A learning result.
         """
         sample = np.asarray(sample)
-        n1 = len(sample)
-        n2 = 0
-
+        phaseOneEnd = len(sample)
+        phaseTwoStart = 0
         if self._dataSplit:
-            n1 = len(sample) // 2
-            if n1 <= 0 or n1 >= len(sample):
-                raise ValueError(f"{self.run.__qualname__}: insufficient data n = {len(sample)}")
-            n2 = n1
+            phaseOneEnd = len(sample) // 2
+            phaseTwoStart = phaseOneEnd
+        
+        if phaseOneEnd <= 0 or phaseTwoStart >= len(sample):
+            raise ValueError(f"{self.run.__qualname__}: insufficient data n = {len(sample)}")
 
         if self._subsampleResultsDir is not None:
             _SubsampleResultIO._prepareSubsampleResultDir(self._subsampleResultsDir)
+        
+        n1 = phaseOneEnd
+        n2 = len(sample) - phaseTwoStart
+        if k1 is None:
+            k1 = min(max(30, n1 // (200 if self._baseLearner.enableDeduplication else 2)), n1)
+        if k1 >= n1:
+            B1 = 1
+        if k2 is None:
+            k2 = min(max(30, n2 // 200), n2)
+        if k2 >= n2:
+            B2 = 1
 
-        learningResults = self._learnOnSubsamples(sample[:n1], k1, B1)
+        learningResults = self._learnOnSubsamples(sample[:phaseOneEnd], k1, B1)
 
         retrievedList: List = []
         if self._baseLearner.enableDeduplication:
@@ -540,13 +557,13 @@ class ROVE(_BaseVE):
         
         cachedEvaluator = _CachedEvaluator(self._baseLearner, retrievedList, sample, self._numParallelEval, self._subsampleResultsDir)
         
-        evalArray = cachedEvaluator._evaluateSubsamples([i for i in range(n2, len(sample))], k2, B2, self._rng)
+        evalArray = cachedEvaluator._evaluateSubsamples([i for i in range(phaseTwoStart, len(sample))], k2, B2, self._rng)
         gapMatrix = self._gapMatrix(evalArray)
 
         if epsilon < 0:
             autoEpsilonProb = min(max(0, autoEpsilonProb), 1)
             if self._dataSplit:
-                evalArray = cachedEvaluator._evaluateSubsamples([i for i in range(0, n1)], k2, B2, self._rng)
+                evalArray = cachedEvaluator._evaluateSubsamples([i for i in range(0, phaseOneEnd)], k2, B2, self._rng)
                 gapMatrix1 = self._gapMatrix(evalArray)
                 epsilon = ROVE._findEpsilon(gapMatrix1, autoEpsilonProb)
             else:
