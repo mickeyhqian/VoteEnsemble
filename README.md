@@ -26,9 +26,12 @@ To use VoteEnsemble, ones needs to supply a base learning algorithm for the prob
 ## Two Simple Use Cases
 ### Linear regression
 Consider a linear regression
-$$
+<!-- $$
 \min_{\theta} E[(Y - X^T\theta)^2]
-$$
+$$ -->
+
+![Equation](./images/LR.png)
+
 where $X$ is the input vector, $Y$ is the response variable, and $\theta$ is the model parameter vector. The script exampleLR.py implements such an example, where the method of least squares is the base learning algorithm, and applies $\mathsf{ROVE}$ and $\mathsf{ROVEs}$ to learn the model parameters. Try the example by running (*scikit-learn* required)
 ```
 python exampleLR.py
@@ -44,13 +47,16 @@ ROVEs outputs the parameters:  [-4.43618871e-16  1.00000000e+00  2.00000000e+00 
 ```
 ### Stochastic linear program
 Consider a linear program with stochastic coefficients in the form of
-$$
+<!-- $$
 \begin{align*}
 \min_{\theta}\  &E[z^T\theta]\\
 \text{s.t.}\ &A\theta \leq b\\
 &l \leq \theta \leq u
 \end{align*}
-$$
+$$ -->
+
+![Equation](./images/LP.png)
+
 where $z$ is the random coefficient vector, $A$ is the constraint matrix, $b$ is the right hand side, and $l,u$ are lower and upper bounds of the decison $\theta$. The script exampleLP.py implements such an example, where the sample average approximation is the base learning algorithm, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running (*cvxpy* required)
 ```
 python exampleLP.py
