@@ -20,10 +20,7 @@ pip install -r requirements.txt
 pip install .
 ```
 ## Quick Start
-To use VoteEnsemble, ones needs to supply a base learning algorithm for the problem. Consider a simple example of solving
-
-
-## Two Simple Use Cases
+To use VoteEnsemble, ones needs to define a base learning algorithm for the problem by subclassing the base class *BaseLearner*. Below are two simple use cases.
 ### Linear regression
 Consider a linear regression
 <!-- $$
