@@ -4,7 +4,6 @@ This repository contains the python code for the ensemble learning methods $\mat
 
 Among the three methods, $\mathsf{ROVE}$ has demonstrated the best empirical performance and therefore is the most recommended choice for general use. Note that $\mathsf{MoVE}$ only applies to problems with discrete model or solution spaces.
 
-
 ## Installation
 1.&nbsp;cd to the root directory, i.e., VoteEnsemble,  of this repository.
 
