@@ -45,7 +45,7 @@ ROVEs outputs the parameters: [-7.11339923e-03  1.00764019e+00  1.97278415e+00  
   8.01337643e+00  8.96901555e+00]
 ```
 ### Stochastic linear program
-Consider a simple linear program with stochastic coefficients
+Consider a simple linear program with random coefficients
 <!-- $$
 \begin{align*}
 \min_{\theta_1,\theta_2}\  &E[z_1\theta_1+z_2\theta_2]\\
@@ -56,7 +56,7 @@ $$ -->
 
 ![Equation](./images/LP.png)
 
-where $z_1,z_2$ are random coefficients, and $\theta_1,\theta_2$ are decision variables. The script `exampleLP.py` implements such as example, where the base learning algorithm is the sample average approximation, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running
+where $z_1,z_2$ are the random coefficients, and $\theta_1,\theta_2$ are the decision variables. The script `exampleLP.py` implements such as example, where the base learning algorithm is the sample average approximation, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running
 ```
 python exampleLP.py
 ```
