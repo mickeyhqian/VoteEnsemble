@@ -45,7 +45,7 @@ ROVEs outputs the parameters: [-7.11339923e-03  1.00764019e+00  1.97278415e+00  
   8.01337643e+00  8.96901555e+00]
 ```
 ### Stochastic linear program
-Consider a simgle linear program with stochastic coefficients in the form of
+Consider a simple linear program with stochastic coefficients in the form of
 <!-- $$
 \begin{align*}
 \min_{\theta_1,\theta_2}\  &E[z_1\theta_1+z_2\theta_2]\\
