@@ -88,7 +88,7 @@ roves = ROVE(yourBaseLearner, True, numParallelLearn=8, numParallelEval=6)
 ```
 For a concrete example, refer to the script `exampleLP.py`.
 ### Offloading Ensembles to Disk
-If your machine learning model or optimization solution is memory-intensive, it may not be feasible to store the entire ensemble in RAM. This implementation provides an option to dynamically offload learned models/solutions to disk, keeping only the active model/solution in RAM. By default, this feature is disabled, but you can enable it as follows:
+If your machine learning model or optimization solution is memory-intensive, it may not be feasible to store the entire ensemble in RAM. This implementation provides a feature to dynamically offload learned models/solutions to disk, keeping only the active model/solution in RAM. By default, this feature is disabled, but you can enable it as follows:
 ```
 # Offload the ensemble in MoVE to the specified directory
 move = MoVE(yourBaseLearner, subsampleResultsDir="path/to/your/directory") 
