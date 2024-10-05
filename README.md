@@ -2,7 +2,7 @@
 
 This repository contains the python code for the ensemble learning methods $\mathsf{MoVE}$, $\mathsf{ROVE}$ and $\mathsf{ROVEs}$ proposed in the paper ''Subsampled Ensemble Can Improve Generalization Tail Exponentially'' (https://arxiv.org/pdf/2405.14741). Unlike traditional ensemble learning methods that are specifically tailored for machine learning model training, $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ are versatile techniques applicable to a broader range of data-driven stochastic optimization problems, including both machine learning model training and stochastic programming. Moreover, they are guaranteed to provide universal exponential control over the tails of out-of-sample performance, making them particularly effective for unstable or slow-converging base learning algorithms such as those impacted by heavy-tailed noise.
 
-Among the three methods, $\mathsf{ROVE}$ has demonstrated the best empirical performance and therefore is the most recommended choice for general use.
+Among the three methods, $\mathsf{ROVE}$ has demonstrated the best empirical performance and therefore is the most recommended choice for general use. Note that $\mathsf{MoVE}$ only applies to problems with discrete model or solution spaces.
 
 
 ## Installation
