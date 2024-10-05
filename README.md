@@ -56,7 +56,7 @@ $$ -->
 
 ![Equation](./images/LP.png)
 
-where $z_1,z_2$ are the random coefficients, and $\theta_1,\theta_2$ are the decision variables. The script `exampleLP.py` implements such as example, where the base learning algorithm is the sample average approximation, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running
+where $z_1,z_2$ are the random coefficients, and $\theta_1,\theta_2$ are the decision variables. The script `exampleLP.py` implements such an example, where the base learning algorithm is the sample average approximation, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running
 ```
 python exampleLP.py
 ```
