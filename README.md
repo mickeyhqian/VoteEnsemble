@@ -2,7 +2,7 @@
 
 This repository contains the Python implementation of the VE (VoteEnsemble) family of ensemble learning methods: $\mathsf{MoVE}$, $\mathsf{ROVE}$ and $\mathsf{ROVEs}$, as proposed in the paper ''Subsampled Ensemble Can Improve Generalization Tail Exponentially'' (https://arxiv.org/pdf/2405.14741). Unlike traditional ensemble learning methods designed primarily for machine learning model training, the VE methods are applicable to a broader range of data-driven stochastic optimization problems, including both machine learning model training and stochastic programming. Moreover, they are guaranteed to provide universal exponential control over the tails of out-of-sample performance, making them particularly effective for unstable or slow-converging base learning algorithms such as those impacted by heavy-tailed noise.
 
-Among the three methods, $\mathsf{ROVE}$ has demonstrated the best empirical performance and therefore is the most recommended choice for general use. Note that $\mathsf{MoVE}$ only applies to problems with discrete model or solution spaces.
+Among the three methods, $\mathsf{ROVE}$ has demonstrated the best empirical performance and therefore is the most recommended choice. $\mathsf{MoVE}$ is specifically suited to problems with discrete model or solution spaces, and may outperform $\mathsf{ROVE}$ when the space has a small cardinality. $\mathsf{ROVE}$ and $\mathsf{ROVEs}$ apply to general stochastic optimization problems. While $\mathsf{ROVEs}$ may have lower accuracy than $\mathsf{ROVE}$ in practice, it is theoretically more robust.
 
 ## Installation
 1.&nbsp;cd to the root directory, i.e., VoteEnsemble,  of this repository.
