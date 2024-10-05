@@ -80,7 +80,6 @@ rove = ROVE(yourBaseLearner, False, numParallelLearn=8, numParallelEval=6)
 # Parallelize ensemble construction and evaluation in ROVEs with 8 and 6 processes respectively
 roves = ROVE(yourBaseLearner, True, numParallelLearn=8, numParallelEval=6)
 ```
-For a concrete example, refer to the script `exampleLP.py`.
 ### Offloading Ensembles to Disk
 If your machine learning model or optimization solution is memory-intensive, it may not be feasible to store the entire ensemble in RAM. This implementation provides a feature to dynamically offload learned models/solutions to disk, keeping only the active model/solution in RAM. By default, this feature is disabled, but you can enable it as follows:
 ```
