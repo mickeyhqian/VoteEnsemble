@@ -30,7 +30,7 @@ $$ -->
 
 ![Equation](./images/LR.png)
 
-where $X$ is the input vector, $Y$ is the response variable, and $\theta$ is the model parameter vector. The script `exampleLR.py` implements such an example, where the method of least squares is the base learning algorithm, and applies $\mathsf{ROVE}$ and $\mathsf{ROVEs}$ to learn the model parameters. Try the example by running (`scikit-learn` required)
+where $X$ is the input vector, $Y$ is the response variable, and $\theta$ is the model parameter vector. The script `exampleLR.py` implements such an example, where the base learning algorithm is least squares, and applies $\mathsf{ROVE}$ and $\mathsf{ROVEs}$ to learn the model parameters. Try the example by running
 ```
 python exampleLR.py
 ```
@@ -45,33 +45,27 @@ ROVEs outputs the parameters: [-7.11339923e-03  1.00764019e+00  1.97278415e+00  
   8.01337643e+00  8.96901555e+00]
 ```
 ### Stochastic linear program
-Consider a linear program with stochastic coefficients in the form of
+Consider a simgle linear program with stochastic coefficients in the form of
 <!-- $$
 \begin{align*}
-\min_{\theta}\  &E[z^T\theta]\\
-\text{s.t.}\ &A\theta \leq b\\
-&l \leq \theta \leq u
+\min_{\theta_1,\theta_2}\  &E[z_1\theta_1+z_2\theta_2]\\
+\text{s.t.}\ &\theta_1+\theta_2=1\\
+& \theta_1,\theta_2\geq 0
 \end{align*}
 $$ -->
 
 ![Equation](./images/LP.png)
 
-where $z$ is the random coefficient vector, $A$ is the constraint matrix, $b$ is the right hand side, and $l,u$ are lower and upper bounds of the decison $\theta$. The script `exampleLP.py` implements such an example, where the sample average approximation is the base learning algorithm, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running (`cvxpy` required)
+where $z_1,z_2$ are random coefficients, and $\theta_1,\theta_2$ are decision variables. The script `exampleLP.py` implements such as example, where the base learning algorithm is the sample average approximation, and applies $\mathsf{MoVE}$, $\mathsf{ROVE}$, and $\mathsf{ROVEs}$ to obtain solution estimates. You can try the example by running
 ```
 python exampleLP.py
 ```
 which shall produce the result
 ```
-True optimal objective value = -15.349275441094298
-MoVE outputs the solution: [1.35655906e-09 9.94023566e+00 7.95126945e-10 2.57448639e+00
- 5.77780176e-08 1.25721531e-09 1.83272283e-08 1.46573859e-09
- 6.97747247e+00 5.22424867e-08], objective value = -15.294764680702862
-ROVE outputs the solution: [2.31131990e-10 1.13393702e-10 1.22780890e-10 9.48606929e+00
- 7.14193413e+00 3.15064932e-10 4.10652774e+00 1.76364405e+00
- 7.82081479e-10 2.73901352e-10], objective value = -15.174436790910121
-ROVEs outputs the solution: [7.31309987e-10 9.94023571e+00 3.63672223e-10 2.57448641e+00
- 1.00839088e-08 3.12572614e-10 1.24294896e-08 4.55585503e-09
- 6.97747247e+00 1.54772390e-09], objective value = -15.294764698873003
+True optimal objective value = 0.0
+MoVE outputs the solution: [1. 0.], objective value = 0.0
+ROVE outputs the solution: [1. 0.], objective value = 0.0
+ROVEs outputs the solution: [1. 0.], objective value = 0.0
 ```
 ## Advanced Tips
 ### Parallel Ensemble Construction and Evaluation

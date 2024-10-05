@@ -1,31 +1,21 @@
 from VoteEnsemble import MoVE, ROVE, BaseLearner
 import numpy as np
 from numpy.typing import NDArray
-import cvxpy as cp
-import time
 
 
 
-# Linear program with stochastic objective
-# min E[\xi^T * x]
-# s.t. A * x <= b
-#      l <= x <= u
+# A simple linear program with stochastic objective
+# min E[\xi_1*x_1 + \xi_2*x_2]
+# s.t. x_1 + x_2 = 1
+#      x_1, x_2 >= 0
 
 class BaseLP(BaseLearner):
-    def __init__(self, A: NDArray, b: NDArray, lb: NDArray, ub: NDArray):
-        self._A: NDArray = np.asarray(A)
-        self._b: NDArray = np.asarray(b)
-        self._lb: NDArray = np.asarray(lb)
-        self._ub: NDArray = np.asarray(ub)
-    
     def learn(self, sample: NDArray) -> NDArray:
-        x = cp.Variable(len(self._lb))
-        prob = cp.Problem(cp.Minimize(np.mean(sample, axis = 0) @ x),
-                          [self._A @ x <= self._b, x >= self._lb, x <= self._ub])
-        prob.solve()
-
-        if prob.status == "optimal":
-            return x.value
+        xiMean = np.mean(sample, axis = 0)
+        if xiMean[0] < xiMean[1]:
+            return np.array([1.0, 0.0])
+        else:
+            return np.array([0.0, 1.0])
     
     @property
     def enableDeduplication(self):
@@ -45,28 +35,22 @@ class BaseLP(BaseLearner):
 if __name__ == "__main__":
     rngData = np.random.default_rng(seed = 888)
 
-    d = 10
-    lb = np.zeros(d)
-    ub = np.full(d, np.inf)
-    rngLP = np.random.default_rng(seed = 999)
-    A = rngLP.uniform(low=0, high=1, size=(5, d))
-    b = 10 * np.ones(5)
-    lp = BaseLP(A, b, lb, ub)
-
-    c = -rngLP.uniform(low=0, high=1, size=d)
+    c = [0.0, 0.2]
+    
+    lp = BaseLP()
     sample = rngData.normal(loc = c, size = (10000, len(c)))
     
     optimalVal = np.dot(c, lp.learn([c]))
     print(f"True optimal objective value = {optimalVal}")
 
-    moveLP = MoVE(lp, randomState = 666, numParallelLearn = 4)
+    moveLP = MoVE(lp, randomState = 666)
     output = moveLP.run(sample)
     print(f"{MoVE.__name__} outputs the solution: {output}, objective value = {np.dot(c, output)}")
 
-    roveLP = ROVE(lp, False, randomState = 666, numParallelLearn = 4)
+    roveLP = ROVE(lp, False, randomState = 666)
     output = roveLP.run(sample)
     print(f"{ROVE.__name__} outputs the solution: {output}, objective value = {np.dot(c, output)}")
 
-    rovesLP = ROVE(lp, True, randomState = 666, numParallelLearn = 4)
+    rovesLP = ROVE(lp, True, randomState = 666)
     output = rovesLP.run(sample)
     print(f"{ROVE.__name__}s outputs the solution: {output}, objective value = {np.dot(c, output)}")
