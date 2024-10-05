@@ -2,7 +2,7 @@
 
 This repository contains the Python implementation of the VE (VoteEnsemble) family of ensemble learning methods: $\mathsf{MoVE}$, $\mathsf{ROVE}$ and $\mathsf{ROVEs}$, as proposed in the paper ''Subsampled Ensemble Can Improve Generalization Tail Exponentially'' (https://arxiv.org/pdf/2405.14741). Unlike traditional ensemble learning methods designed primarily for machine learning model training, the VE methods are applicable to a broader range of data-driven stochastic optimization problems, including both machine learning model training and stochastic programming. Moreover, they are guaranteed to provide universal exponential control over the tails of out-of-sample performance, making them particularly effective for unstable or slow-converging base learning algorithms such as those impacted by heavy-tailed noise.
 
-Among the three methods, $\mathsf{ROVE}$ has demonstrated the best empirical performance and therefore is the most recommended choice. $\mathsf{MoVE}$ is specifically suited to problems with discrete model or solution spaces, and may outperform $\mathsf{ROVE}$ when the space has a small cardinality. $\mathsf{ROVE}$ and $\mathsf{ROVEs}$ apply to general stochastic optimization problems. While $\mathsf{ROVEs}$ may have lower accuracy than $\mathsf{ROVE}$ in practice, it is theoretically more robust.
+Among the three methods, $\mathsf{ROVE}$ has demonstrated the best empirical performance and therefore is the most recommended choice. $\mathsf{MoVE}$ is specifically suited to problems with discrete model or solution spaces, and may outperform $\mathsf{ROVE}$ when the space has a small cardinality. $\mathsf{ROVEs}$, like $\mathsf{ROVE}$, applies to general stochastic optimization problems. While it may have lower accuracy than $\mathsf{ROVE}$ in practice, $\mathsf{ROVEs}$ is theoretically more robust.
 
 ## Installation
 1.&nbsp;cd to the root directory, i.e., VoteEnsemble,  of this repository.
@@ -72,4 +72,30 @@ ROVE outputs the solution: [2.31131990e-10 1.13393702e-10 1.22780890e-10 9.48606
 ROVEs outputs the solution: [7.31309987e-10 9.94023571e+00 3.63672223e-10 2.57448641e+00
  1.00839088e-08 3.12572614e-10 1.24294896e-08 4.55585503e-09
  6.97747247e+00 1.54772390e-09], objective value = -15.294764698873003
+```
+## Advanced Tips
+### Parallel Ensemble Construction and Evaluation
+The VE methods involve constructing and evaluating ensembles on many random subsamples of the full dataset, which can be easily parallelized. This implementation supports parallelization through multiprocessing. By default, parallelization is disabled, but you can enable it when creating instances of each method as follows:
+```
+# Parallelize ensemble construction in MoVE with 8 processes
+move = MoVE(yourBaseLearner, numParallelLearn=8) 
+
+# Parallelize ensemble construction and evaluation in ROVE with 8 and 6 processes respectively
+rove = ROVE(yourBaseLearner, False, numParallelLearn=8, numParallelEval=6)
+
+# Parallelize ensemble construction and evaluation in ROVEs with 8 and 6 processes respectively
+roves = ROVE(yourBaseLearner, True, numParallelLearn=8, numParallelEval=6)
+```
+For a concrete example, refer to the script `exampleLP.py`.
+### Offloading Ensembles to Disk
+If your machine learning model or optimization solution is memory-intensive, it may not be feasible to store the entire ensemble in RAM. This implementation provides an option to dynamically offload learned models/solutions to disk, keeping only the active model/solution in RAM. By default, this feature is disabled, but you can enable it as follows:
+```
+# Offload the ensemble in MoVE to the specified directory
+move = MoVE(yourBaseLearner, subsampleResultsDir="path/to/your/directory") 
+
+# Offload the ensemble in ROVE to the specified directory
+rove = ROVE(yourBaseLearner, False, subsampleResultsDir="path/to/your/directory")
+
+# Offload the ensemble in ROVEs to the specified directory and retain it after execution
+roves = ROVE(yourBaseLearner, True, subsampleResultsDir="path/to/your/directory", deleteSubsampleResults=False)
 ```
