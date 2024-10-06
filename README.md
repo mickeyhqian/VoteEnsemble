@@ -81,7 +81,7 @@ rove = ROVE(yourBaseLearner, False, numParallelLearn=8, numParallelEval=6)
 roves = ROVE(yourBaseLearner, True, numParallelLearn=8, numParallelEval=6)
 ```
 ### Offloading Ensembles to Disk
-If your machine learning model or optimization solution is memory-intensive, it may not be feasible to store the entire ensemble in RAM. This implementation provides a feature to offload all learned models/solutions to disk, except those currently needed by the methods. By default, this feature is disabled, but you can enable it as follows:
+If your machine learning model or optimization solution is memory-intensive, it may not be feasible to store the entire ensemble in RAM. This implementation provides a feature to offload all learned models/solutions to disk, and load a model/solution to memory only when the methods need access to it. By default, this feature is disabled, but you can enable it as follows:
 ```
 # Offload the ensemble in MoVE to the specified directory
 move = MoVE(yourBaseLearner, subsampleResultsDir="path/to/your/directory") 
