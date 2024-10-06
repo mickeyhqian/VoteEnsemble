@@ -1,7 +1,6 @@
 from VoteEnsemble import ROVE, BaseLearner
 import numpy as np
 from numpy.typing import NDArray
-from sklearn.linear_model import LinearRegression
 import time
 
 
@@ -10,12 +9,14 @@ import time
 # min E[(y - x * \beta)^2]
 
 class BaseLR(BaseLearner):
-    def learn(self, sample: NDArray) -> LinearRegression:
+    def learn(self, sample: NDArray) -> NDArray:
         y = sample[:,0]
         X = sample[:,1:]
-        lr = LinearRegression(fit_intercept = False)
-        lr.fit(X, y)
-        return lr
+        gram = np.dot(X.T, X)
+        try:
+            return np.linalg.solve(gram, np.dot(X.T, y))
+        except:
+            return None
 
     @property
     def enableDeduplication(self):
@@ -24,8 +25,8 @@ class BaseLR(BaseLearner):
     def isDuplicate(self):
         pass
     
-    def objective(self, learningResult: LinearRegression, sample: NDArray) -> NDArray:
-        error = learningResult.predict(sample[:, 1:]) - sample[:, 0]
+    def objective(self, learningResult: NDArray, sample: NDArray) -> NDArray:
+        error = np.dot(sample[:, 1:], learningResult) - sample[:, 0]
         return error ** 2
 
     @property
@@ -36,12 +37,13 @@ class BaseLR(BaseLearner):
 if __name__ == "__main__":
     rngData = np.random.default_rng(seed = 888)
 
+    lr = BaseLR()
+    
     d = 10
     beta = np.linspace(0, 9, num = d)
     dataX = rngData.normal(size = (10000, d))
     dataY = (np.dot(dataX, beta) + rngData.normal(size = len(dataX))).reshape(-1, 1)
     sample = np.hstack((dataY, dataX))
-    lr = BaseLR()
 
     # skip MoVE as lr.enableDeduplication() == False
     
@@ -49,8 +51,8 @@ if __name__ == "__main__":
     
     roveLR = ROVE(lr, False, randomState = 666)
     output = roveLR.run(sample)
-    print(f"{ROVE.__name__} outputs the parameters: {output.coef_}")
+    print(f"{ROVE.__name__} outputs the parameters: {output}")
 
     rovesLR = ROVE(lr, True, randomState = 666)
     output = rovesLR.run(sample)
-    print(f"{ROVE.__name__}s outputs the parameters: {output.coef_}")
+    print(f"{ROVE.__name__}s outputs the parameters: {output}")
