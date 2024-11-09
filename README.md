@@ -67,7 +67,7 @@ MoVE outputs the solution: [1. 0.], objective value = 0.0
 ROVE outputs the solution: [1. 0.], objective value = 0.0
 ROVEs outputs the solution: [1. 0.], objective value = 0.0
 ```
-## Advanced Tips
+## Advanced Usage
 ### Parallel Ensemble Construction and Evaluation
 The VE methods involve constructing and evaluating ensembles on many random subsamples of the full dataset, which can be easily parallelized. This implementation supports parallelization through multiprocessing. By default, parallelization is disabled, but you can enable it when creating instances of each method as follows:
 ```
