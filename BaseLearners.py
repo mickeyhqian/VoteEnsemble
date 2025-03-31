@@ -180,10 +180,11 @@ class BaseNN(BaseLearner):
                 numStall = 0
             else:
                 numStall += 1
-            # logger.info(f"#epochs = {i}, training loss = {trainLoss}, validation loss = {validLoss}, best validation loss = {bestValidLoss}, #stall = {numStall}")
+            # logger.info(f"#epochs = {i}, validation loss = {validLoss}, best validation loss = {bestValidLoss}, #stall = {numStall}")
 
+            # if i >= 6 and numStall >= 3:
             if numStall >= 3:
-                # logger.info("early stopped due to #stall")
+                # logger.info(f"early stopped due to stalling with #epochs = {i}")
                 break
 
             model.train()

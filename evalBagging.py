@@ -23,7 +23,10 @@ if __name__ == "__main__":
     else:
         resultDir = os.path.join(os.path.dirname(__file__), str(uuid4()))
 
-    sampleSizeList = [65536]
+    sampleSizeList = [2**i for i in range(10, 17)]
+    # sampleSizeList = [2**12, 2**13]
+    # sampleSizeList = [2**14, 2**15]
+    # sampleSizeList = [2**16]
     caseName = "_".join([str(entry) for entry in sampleSizeList])
 
     os.makedirs(resultDir, exist_ok = True)

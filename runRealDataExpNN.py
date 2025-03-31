@@ -81,4 +81,4 @@ if __name__ == "__main__":
              numParallelLearn = 1, 
              numParallelEval = 1,
              dumpSubsampleResults = True,
-             runConventionalBagging = False)
+             runConventionalBagging = True)
