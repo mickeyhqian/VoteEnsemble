@@ -47,29 +47,34 @@ if __name__ == "__main__":
         YSample = np.asarray([[trueMapping(x)] for x in XSample])
         return np.hstack((YSample, XSample))
     
-    baseNN = BaseTree()
-    # baseNN = BaseNN([50, 300, 500, 500, 300, 50], learningRate = 0.001, useGPU = False)
-    # baseNN = BaseNN([50, 300, 300, 50], learningRate = 0.001, useGPU = False)
-    # baseNN = BaseNN([50, 50], learningRate = 0.001, useGPU = False)
+    baseTree = BaseTree()
 
     evalSample = evalSampler(1000000)
+    
 
     def evaluator(learningResult: DecisionTreeRegressor, repIndex: int) -> float:
-        return baseNN.objective(learningResult, evalSample).mean()
+        return baseTree.objective(learningResult, evalSample).mean()
+    
+    def inference(learningResult: DecisionTreeRegressor, repIndex: int) -> NDArray[np.float64]:
+        return learningResult.predict(evalSample[:, 1:])
 
+    def loss(prediction: NDArray[np.float64], repIndex: int) -> float:
+        return np.mean((prediction - evalSample[:, 0])**2)
 
     sampleSizeList = [2**i for i in range(12, 14)]
     kList = []
     BList = []
     k12List = [((30, 0.5), (30, 0.005))]
     B12List = [(50, 200)]
-    numReplicates = 100
+    numReplicates = 10
 
     
     pipeline(resultDir,
-             baseNN, 
+             baseTree, 
              sampler, 
              evaluator, 
+             inference,
+             loss,
              sampleSizeList, 
              kList, 
              BList, 
@@ -79,4 +84,4 @@ if __name__ == "__main__":
              numParallelLearn = 1, 
              numParallelEval = 1,
              dumpSubsampleResults = True,
-             runConventionalBagging = False)
+             runConventionalBagging = True)

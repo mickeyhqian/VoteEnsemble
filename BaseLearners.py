@@ -9,7 +9,6 @@ from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import GridSearchCV
-from xgboost import XGBRegressor
 from gurobipy import Model, GRB, quicksum
 from typing import List, Union, Dict, Tuple
 

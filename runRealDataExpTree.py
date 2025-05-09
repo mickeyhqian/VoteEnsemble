@@ -67,6 +67,8 @@ if __name__ == "__main__":
              baseTree, 
              sampler, 
              evaluator, 
+             None,
+             None,
              sampleSizeList, 
              kList, 
              BList, 
@@ -76,4 +78,4 @@ if __name__ == "__main__":
              numParallelLearn = 1, 
              numParallelEval = 1,
              dumpSubsampleResults = True,
-             runConventionalBagging = True)
+             runConventionalBagging = False)

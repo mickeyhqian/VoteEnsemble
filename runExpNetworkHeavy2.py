@@ -75,6 +75,8 @@ if __name__ == "__main__":
              network, 
              sampler, 
              evaluator, 
+             None,
+             None,
              sampleSizeList, 
              kList, 
              BList, 

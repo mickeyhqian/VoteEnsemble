@@ -60,6 +60,8 @@ if __name__ == "__main__":
              portfolio, 
              sampler, 
              evaluator, 
+             None, 
+             None,
              sampleSizeList, 
              kList, 
              BList, 

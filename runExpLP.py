@@ -91,6 +91,8 @@ if __name__ == "__main__":
              lp, 
              sampler, 
              evaluator, 
+             None,
+             None,
              sampleSizeList, 
              kList, 
              BList, 

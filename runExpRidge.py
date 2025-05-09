@@ -55,6 +55,8 @@ if __name__ == "__main__":
              lr, 
              sampler, 
              evaluator, 
+             None, 
+             None,
              sampleSizeList, 
              kList, 
              BList, 

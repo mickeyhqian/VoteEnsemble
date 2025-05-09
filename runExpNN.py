@@ -76,6 +76,8 @@ if __name__ == "__main__":
              baseNN, 
              sampler, 
              evaluator, 
+             None,
+             None,
              sampleSizeList, 
              kList, 
              BList, 
