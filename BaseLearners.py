@@ -7,6 +7,9 @@ import torch
 from torch import nn
 from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.model_selection import GridSearchCV
+from xgboost import XGBRegressor
 from gurobipy import Model, GRB, quicksum
 from typing import List, Union, Dict, Tuple
 
@@ -254,6 +257,227 @@ class BaseNN(BaseLearner):
         if device.type == "cuda":
             torch.cuda.empty_cache()
         return torch.concat(YPred)
+    
+    
+class BaseLogNN(BaseLearner):
+    def __init__(self, layerSizes: List[int], batchSize: int = 64, minEpochs: int = 10, maxEpochs: int = 30, learningRate: float = 1e-3, useGPU: bool = False):
+        self._layerSizes: List[int] = layerSizes
+        self._batchSize: int = batchSize
+        self._minEpochs: int = max(1, minEpochs)
+        self._maxEpochs: int = max(1, maxEpochs)
+        self._learningRate: float = learningRate
+        self._device: torch.device = torch.device("cuda" if useGPU and torch.cuda.is_available() else "cpu")
+        self._cpu: torch.device = torch.device("cpu")
+
+    def _evaluate(self, learningResult: RegressionNN, dataloader: DataLoader, device: torch.device) -> torch.Tensor:
+        learningResult.eval()
+        # criterion = nn.MSELoss(reduction = "none")
+        # lossValues = []
+        yValues = []
+        with torch.no_grad():
+            for inputs, targets in dataloader:
+                inputs = inputs.to(device)
+                targets = targets.to(device)
+                outputs = learningResult(inputs)
+                # newLoss = criterion(outputs, targets)
+                # lossValues.append(newLoss)
+                yValues.append(outputs)
+
+        return torch.cat(yValues)
+
+    def learn(self, sample: NDArray) -> RegressionNN:
+        torch.manual_seed(1109)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+        model = RegressionNN(sample.shape[1] - 1, self._layerSizes).to(self._device)
+        
+        criterion = nn.MSELoss()
+        optimizer = optim.Adam(model.parameters(), lr = self._learningRate)
+
+        trainSize = int(len(sample) * 0.7)
+        validSize = len(sample) - trainSize
+
+        if trainSize < 1 or validSize < 1:
+            raise ValueError(f"Insufficient data: training set size = {trainSize}, validation set size = {validSize}")
+
+        trainTensorX = torch.Tensor(sample[:trainSize, 1:])
+        trainTensorY = torch.Tensor(sample[:trainSize, :1])
+        trainDataset = TensorDataset(trainTensorX, np.log(trainTensorY))  # Create dataset
+        trainDataLoader = DataLoader(trainDataset, batch_size = self._batchSize, shuffle = True)  # Create DataLoader
+        # evalDataLoader = DataLoader(trainDataset, batch_size = 131072, shuffle = False)  # Create DataLoader
+
+        validTensorX = torch.Tensor(sample[trainSize:, 1:])
+        validTensorY = torch.Tensor(sample[trainSize:, :1])
+        validDataset = TensorDataset(validTensorX, np.log(validTensorY))  # Create dataset
+        validDataLoader = DataLoader(validDataset, batch_size = 131072, shuffle = False)  # Create DataLoader
+
+        minSize = 16384
+        maxSize = 131072
+        numEpochs = np.log(trainSize / minSize) * (self._minEpochs - self._maxEpochs) / np.log(maxSize / minSize) + self._maxEpochs
+        numEpochs = max(min(int(numEpochs), self._maxEpochs), self._minEpochs)
+
+        bestValidLoss = float("inf")
+        numStall = 0
+        for i in range(numEpochs):
+            # trainLoss = self._evaluate(model, evalDataLoader, self._device).mean().item()
+            # validLoss = self._evaluate(model, validDataLoader, self._device).mean().item()
+            validValues = self._evaluate(model, validDataLoader, self._device).to(self._cpu)
+            validCriterion = nn.MSELoss()
+            validLoss = validCriterion(validValues, np.log(validTensorY)).item()
+            if i == 0 or validLoss < bestValidLoss * 0.97:
+                bestValidLoss = validLoss
+                numStall = 0
+            else:
+                numStall += 1
+            # logger.info(f"#epochs = {i}, validation loss = {validLoss}, best validation loss = {bestValidLoss}, #stall = {numStall}")
+
+            # if i >= 6 and numStall >= 3:
+            if numStall >= 3:
+                # logger.info(f"early stopped due to stalling with #epochs = {i}")
+                break
+
+            model.train()
+            for inputs, targets in trainDataLoader:
+                inputs = inputs.to(self._device)
+                targets = targets.to(self._device)
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
+
+        model.to(self._cpu)
+        if self._device.type == "cuda":
+            torch.cuda.empty_cache()
+        return model
+
+    @property
+    def enableDeduplication(self):
+        return False
+
+    def isDuplicate(self):
+        pass
+
+    def objective(self, learningResult: RegressionNN, sample: NDArray, device: Union[torch.device, None] = None) -> NDArray:
+        if device is None:
+            device = self._device
+
+        learningResult.to(device)
+
+        tensorX = torch.Tensor(sample[:, 1:])
+        tensorY = torch.Tensor(sample[:, :1])
+        dataset = TensorDataset(tensorX, np.log(tensorY))  # Create dataset
+        dataloader = DataLoader(dataset, batch_size = 131072, shuffle = False)  # Create DataLoader
+
+        objValues = self._evaluate(learningResult, dataloader, device).to(self._cpu)
+        
+        criterion = nn.MSELoss(reduction = "none")
+        obj = criterion(np.minimum(np.exp(objValues), 1e8), tensorY).numpy().flatten()
+
+        learningResult.to(self._cpu)
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        return obj
+
+    @property
+    def isMinimization(self):
+        return True
+    
+    def inference(self, learningResult: RegressionNN, sample: NDArray, device: Union[torch.device, None] = None) -> torch.Tensor:
+        if device is None:
+            device = self._device
+
+        learningResult.to(device)
+
+        tensorX = torch.Tensor(sample[:, 1:])
+        dataset = TensorDataset(tensorX)  # Create dataset
+        dataloader = DataLoader(dataset, batch_size = 131072, shuffle = False)  # Create DataLoader
+
+        learningResult.eval()
+
+        YPred = []
+        with torch.no_grad():
+            for inputs in dataloader:
+                inputs = inputs[0].to(device)
+                outputs = learningResult(inputs)
+                YPred.append(outputs.to(self._cpu))
+
+        learningResult.to(self._cpu)
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        return torch.concat(YPred)
+    
+    
+class BaseTree(BaseLearner):
+    def __init__(self, minSplit: int = 2, minLeaf: int = 1):
+        self._minSplit: int = minSplit
+        self._minLeaf: int = minLeaf
+    # def __init__(self, minSplitCandidates: List[int] = [2, 5, 10, 20], minLeafCandidates: List[int] = [1, 4, 10]):
+    #     self._minSplits: List[int] = minSplitCandidates.copy()
+    #     self._minLeaves: List[int] = minLeafCandidates.copy()
+        
+    def learn(self, sample: NDArray) -> Union[DecisionTreeRegressor, None]:
+        # param_grid = {
+        #     'min_samples_split': self._minSplits.copy(),
+        #     'min_samples_leaf': self._minLeaves.copy(),
+        # }
+        # reg_tree = DecisionTreeRegressor(random_state = 666)
+        # grid_search = GridSearchCV(reg_tree, param_grid, cv=5, scoring='neg_mean_squared_error')
+        # grid_search.fit(sample[:, 1:], sample[:, 0])
+        
+        # reg_tree = DecisionTreeRegressor(random_state = 666, 
+        #                                  min_samples_split = grid_search.best_params_["min_samples_split"], 
+        #                                  min_samples_leaf = grid_search.best_params_["min_samples_leaf"])
+        reg_tree = DecisionTreeRegressor(random_state = 666, 
+                                         min_samples_split = self._minSplit, 
+                                         min_samples_leaf = self._minLeaf)
+        try:
+            reg_tree.fit(sample[:, 1:], sample[:, 0])
+        except:
+            return
+        return reg_tree
+    
+    @property
+    def enableDeduplication(self):
+        return False
+    
+    def isDuplicate(self):
+        pass
+
+    def objective(self, learningResult: DecisionTreeRegressor, sample: NDArray) -> NDArray:
+        return (sample[:, 0] - learningResult.predict(sample[:, 1:]))**2
+
+    @property
+    def isMinimization(self):
+        return True
+    
+
+class BaseXGB(BaseLearner):
+    def __init__(self, numThreads: int):
+        self._numThreads: int = numThreads
+    
+    def learn(self, sample: NDArray) -> Union[XGBRegressor, None]:
+        reg_tree = XGBRegressor(n_jobs = self._numThreads, random_state = 666)
+        try:
+            reg_tree.fit(sample[:, 1:], sample[:, 0])
+        except:
+            return
+        return reg_tree
+    
+    @property
+    def enableDeduplication(self):
+        return False
+    
+    def isDuplicate(self):
+        pass
+
+    def objective(self, learningResult: XGBRegressor, sample: NDArray) -> NDArray:
+        return (sample[:, 0] - learningResult.predict(sample[:, 1:]))**2
+
+    @property
+    def isMinimization(self):
+        return True
     
     
 class BaseLP(BaseLearner):
