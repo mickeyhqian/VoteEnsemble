@@ -61,12 +61,12 @@ if __name__ == "__main__":
     def loss(prediction: NDArray[np.float64], repIndex: int) -> float:
         return np.mean((prediction - evalSample[:, 0])**2)
 
-    sampleSizeList = [2**i for i in range(12, 14)]
+    sampleSizeList = [2**i for i in range(10, 17)]
     kList = []
     BList = []
     k12List = [((30, 0.5), (30, 0.005))]
     B12List = [(50, 200)]
-    numReplicates = 10
+    numReplicates = 100
 
     
     pipeline(resultDir,
