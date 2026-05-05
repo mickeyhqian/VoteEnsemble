@@ -8,8 +8,10 @@ from torch import nn
 from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.model_selection import GridSearchCV
 from gurobipy import Model, GRB, quicksum
+from xgboost import XGBRegressor
 from typing import List, Union, Dict, Tuple
 
 
@@ -278,9 +280,11 @@ class BaseTree(BaseLearner):
         # reg_tree = DecisionTreeRegressor(random_state = 666, 
         #                                  min_samples_split = grid_search.best_params_["min_samples_split"], 
         #                                  min_samples_leaf = grid_search.best_params_["min_samples_leaf"])
-        reg_tree = DecisionTreeRegressor(random_state = 666, 
-                                         min_samples_split = self._minSplit, 
-                                         min_samples_leaf = self._minLeaf)
+        reg_tree = DecisionTreeRegressor(
+            random_state = 666, 
+            min_samples_split = self._minSplit, 
+            min_samples_leaf = self._minLeaf
+        )
         try:
             reg_tree.fit(sample[:, 1:], sample[:, 0])
         except:
@@ -295,6 +299,127 @@ class BaseTree(BaseLearner):
         pass
 
     def objective(self, learningResult: DecisionTreeRegressor, sample: NDArray) -> NDArray:
+        return (sample[:, 0] - learningResult.predict(sample[:, 1:]))**2
+
+    @property
+    def isMinimization(self):
+        return True
+    
+    
+class BaseRF(BaseLearner):
+    def __init__(self, ensembleSize: int, minSplit: int = 2, minLeaf: int = 1, subsampleRatio: float = 1.0):
+        self._ensembleSize: int = ensembleSize
+        self._minSplit: int = minSplit
+        self._minLeaf: int = minLeaf
+        self._subsampleRatio: float = subsampleRatio
+        
+    def learn(self, sample: NDArray) -> Union[RandomForestRegressor, None]:
+        reg_tree = RandomForestRegressor(
+            n_estimators = self._ensembleSize, 
+            random_state = 666, 
+            min_samples_split = self._minSplit, 
+            min_samples_leaf = self._minLeaf,
+            max_samples = self._subsampleRatio
+        )
+        try:
+            reg_tree.fit(sample[:, 1:], sample[:, 0])
+        except:
+            return
+        return reg_tree
+    
+    @property
+    def enableDeduplication(self):
+        return False
+    
+    def isDuplicate(self):
+        pass
+
+    def objective(self, learningResult: RandomForestRegressor, sample: NDArray) -> NDArray:
+        return (sample[:, 0] - learningResult.predict(sample[:, 1:]))**2
+
+    @property
+    def isMinimization(self):
+        return True
+    
+    
+class BaseGBDT(BaseLearner):
+    def __init__(self, ensembleSize: int, minSplit: int = 2, minLeaf: int = 1, subsampleRatio: float = 1.0, earlyStop: bool = True):
+        self._ensembleSize: int = ensembleSize
+        self._minSplit: int = minSplit
+        self._minLeaf: int = minLeaf
+        self._subsampleRatio: float = subsampleRatio
+        self._earlyStop: bool = earlyStop
+        
+    def learn(self, sample: NDArray) -> Union[GradientBoostingRegressor, None]:
+        reg_tree = GradientBoostingRegressor(
+            n_estimators = self._ensembleSize, 
+            random_state = 666, 
+            min_samples_split = self._minSplit, 
+            min_samples_leaf = self._minLeaf,
+            subsample = self._subsampleRatio,
+            n_iter_no_change = 3 if self._earlyStop else None
+        )
+        try:
+            reg_tree.fit(sample[:, 1:], sample[:, 0])
+        except:
+            return
+        return reg_tree
+    
+    @property
+    def enableDeduplication(self):
+        return False
+    
+    def isDuplicate(self):
+        pass
+
+    def objective(self, learningResult: GradientBoostingRegressor, sample: NDArray) -> NDArray:
+        return (sample[:, 0] - learningResult.predict(sample[:, 1:]))**2
+
+    @property
+    def isMinimization(self):
+        return True
+    
+
+class BaseXGB(BaseLearner):
+    def __init__(self, ensembleSize: int, subsampleRatio: float = 1.0, earlyStop: bool = True):
+        self._ensembleSize: int = ensembleSize
+        self._subsampleRatio: float = subsampleRatio
+        self._earlyStop: bool = earlyStop
+        
+    def learn(self, sample: NDArray) -> Union[XGBRegressor, None]:
+        if self._earlyStop:
+            reg_tree = XGBRegressor(
+                n_estimators = self._ensembleSize, 
+                random_state = 666, 
+                subsample = self._subsampleRatio,
+                early_stopping_rounds = 3
+            )
+            trainEnd = max(1, int(len(sample) * 0.9))
+            try:
+                reg_tree.fit(sample[:trainEnd, 1:], sample[:trainEnd, 0], eval_set = [(sample[trainEnd:, 1:], sample[trainEnd:, 0])], verbose = False)
+            except:
+                return
+        else:
+            reg_tree = XGBRegressor(
+                n_estimators = self._ensembleSize, 
+                random_state = 666, 
+                subsample = self._subsampleRatio
+            )
+            try:
+                reg_tree.fit(sample[:, 1:], sample[:, 0])
+            except:
+                return
+            
+        return reg_tree
+    
+    @property
+    def enableDeduplication(self):
+        return False
+    
+    def isDuplicate(self):
+        pass
+
+    def objective(self, learningResult: XGBRegressor, sample: NDArray) -> NDArray:
         return (sample[:, 0] - learningResult.predict(sample[:, 1:]))**2
 
     @property

@@ -3,6 +3,7 @@ from VoteEnsemble import BaseLearner, MoVE, ROVE
 import numpy as np
 from numpy.typing import NDArray
 import pickle
+import json
 import matplotlib.pyplot as plt
 import os
 from scipy.stats import norm
@@ -245,7 +246,8 @@ def dumpEvalResults(
     k12List: List[Tuple[Tuple[int, float], Tuple[int, float]]], 
     B12List: List[Tuple[int, int]],
     numReplicates: int,
-    filePath: str
+    filePath: str,
+    briefResultFile: str
 ):
     os.makedirs(os.path.dirname(filePath), exist_ok = True)
     with open(filePath, "wb") as f:
@@ -268,6 +270,79 @@ def dumpEvalResults(
             numReplicates,
         ), f)
     logger.info(f"dumped evaluation results to {filePath}")
+    
+    def getBrief(objList: List[float]):
+        avg = np.mean(objList)
+        error = np.std(objList) / np.sqrt(numReplicates)
+        quantiles = np.quantile(objList, q = [0.5, 0.8, 0.9, 0.95, 0.975, 0.99])
+        return {
+            "mean": float(avg),
+            "std error": float(error),
+            "50% quantile": float(quantiles[0]),
+            "80% quantile": float(quantiles[1]),
+            "90% quantile": float(quantiles[2]),
+            "95% quantile": float(quantiles[3]),
+            "97.5% quantile": float(quantiles[4]),
+            "99% quantile": float(quantiles[5]),
+        }
+    
+    briefDict = {}
+    for i in range(len(sampleSizeList)):
+        newSizeResult = {}
+        briefDict[f"sampleSize_{sampleSizeList[i]}"] = newSizeResult
+        if len(baseObjList[i]) > 0:
+            newSizeResult["base"] = getBrief(baseObjList[i])
+            
+        newMoveResult = {}
+        for j in range(len(BList)):
+            ind1 = str(BList[j])
+            if ind1 not in newMoveResult:
+                newMoveResult[ind1] = {}
+            for k in range(len(kList)):
+                if len(MoVEObjList[i][j][k]) > 0:
+                    if "MoVE" not in newSizeResult:
+                        newSizeResult["MoVE"] = newMoveResult
+                    ind2 = str(kList[k])
+                    newMoveResult[ind1][ind2] = getBrief(MoVEObjList[i][j][k])
+                
+        newRoveResult = {}
+        for j in range(len(B12List)):
+            ind1 = str(B12List[j])
+            if ind1 not in newRoveResult:
+                newRoveResult[ind1] = {}
+            for k in range(len(k12List)):
+                if len(ROVEObjList[i][j][k]) > 0:
+                    if "ROVE" not in newSizeResult:
+                        newSizeResult["ROVE"] = newRoveResult
+                    ind2 = str(k12List[k])
+                    newRoveResult[ind1][ind2] = getBrief(ROVEObjList[i][j][k])
+                    
+        newRovesResult = {}
+        for j in range(len(B12List)):
+            ind1 = str(B12List[j])
+            if ind1 not in newRovesResult:
+                newRovesResult[ind1] = {}
+            for k in range(len(k12List)):
+                if len(ROVEsObjList[i][j][k]) > 0:
+                    if "ROVEs" not in newSizeResult:
+                        newSizeResult["ROVEs"] = newRovesResult
+                    ind2 = str(k12List[k])
+                    newRovesResult[ind1][ind2] = getBrief(ROVEsObjList[i][j][k])
+                    
+        newBaggingResult = {}
+        for j in range(len(B12List)):
+            ind1 = str(B12List[j])
+            if ind1 not in newBaggingResult:
+                newBaggingResult[ind1] = {}
+            for k in range(len(k12List)):
+                if len(baggingObjList[i][j][k]) > 0:
+                    if "bagging" not in newSizeResult:
+                        newSizeResult["bagging"] = newBaggingResult
+                    ind2 = str(k12List[k])
+                    newBaggingResult[ind1][ind2] = getBrief(baggingObjList[i][j][k])
+                    
+    with open(briefResultFile, "w") as f:
+        json.dump(briefDict, f, indent = 4)
 
 
 def loadResults(filePath: str):
@@ -440,6 +515,7 @@ def pipeline(
     ROVEsObjAvg = []
     baggingObjAvg = []
     evalResultFile = os.path.join(resultDir, "evalResults.pkl")
+    briefResultFile = os.path.join(resultDir, "resultBrief.json")
 
     sampleSizeFinished = []
 
@@ -522,7 +598,8 @@ def pipeline(
                 k12List, 
                 B12List,
                 numReplicates,
-                evalResultFile
+                evalResultFile,
+                briefResultFile
             )
             
             plotOngoingAverage(
@@ -559,7 +636,7 @@ def pipeline(
         
 default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 markers = ["o", "s", "d", "^", "*"]
-lineStyles = ["solid", "dashed", "dashdot", "dotted", (0, (3, 5, 1, 5))]
+lineStyles = ["solid", "dashed", "dashdot", "dotted", (0, (3, 5, 1, 5)), (0, (3, 1, 1, 3)), (0, (5, 3, 5, 1))]
 # plt.rcParams['text.usetex'] = True
 # plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
 
@@ -726,6 +803,97 @@ def plotCDF(
     ax.tick_params(axis='y', labelsize=14)
     ax.grid()
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol = numLines, fontsize = 14, frameon = False)
+    # # Create a legend using the first subplot
+    # handles, labels = ax.get_legend_handles_labels()
+
+    # # Place the combined legend outside the subplots
+    # fig.legend(handles, labels, loc = 'upper center', bbox_to_anchor = (0.5, 0.95), fontsize = 'small')
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    os.makedirs(os.path.dirname(filePath), exist_ok = True)
+    fig.savefig(filePath, dpi = 500, bbox_inches = 'tight')
+    
+    
+def plotTreeCDF(
+    baseObjList: List, 
+    ROVEObjList: List, 
+    ROVEsObjList: List, 
+    RFObjList: List,
+    GBDTObjList: List,
+    XGBObjList: List,
+    filePath: str,
+    xLogScale: bool = False,
+    yLogScale: bool = True
+):
+    fig, ax = plt.subplots()
+
+    def getCDF(sequence):
+        xList = []
+        yList = []
+        for num in sorted(sequence):
+            if len(xList) == 0:
+                xList.append(num)
+                yList.append(1 / len(sequence))
+            elif num > xList[-1]:
+                xList.append(num)
+                yList.append(yList[-1] + 1 / len(sequence))
+            else:
+                yList[-1] += 1 / len(sequence)
+        
+        tailList = []
+        for i in range(len(yList)):
+            if i == 0:
+                tailList.append(1)
+            else:
+                tailList.append(1 - yList[i - 1])
+
+        return xList, tailList
+
+    numLines = 0
+    minX = float("inf")
+    if len(baseObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(baseObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[0], linestyle = lineStyles[0], label = 'base', linewidth = 2)
+    if len(ROVEObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(ROVEObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[2], linestyle = lineStyles[2], label = ROVE.__name__, linewidth = 2)
+    if len(ROVEsObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(ROVEsObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[3], linestyle = lineStyles[3], label = f"{ROVE.__name__}s", linewidth = 2)
+    if len(RFObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(RFObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[4], linestyle = lineStyles[4], label = 'RF', linewidth = 2)
+    if len(GBDTObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(GBDTObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[5], linestyle = lineStyles[5], label = 'GBDT', linewidth = 2)
+    if len(XGBObjList) > 0:
+        numLines += 1
+        xList, yList = getCDF(XGBObjList)
+        minX = min(minX, np.amin(xList))
+        ax.plot(xList, yList, color = default_colors[6], linestyle = lineStyles[6], label = 'XGB', linewidth = 2)
+        
+    if numLines == 0:
+        return
+    
+    ax.set_xlabel('cost', size = 16)
+    ax.set_ylabel('tail prob.', size = 16)
+    if xLogScale and minX > 0:
+        ax.set_xscale('log')
+    if yLogScale:
+        ax.set_yscale('log')
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
+    ax.grid()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol = numLines // 2, fontsize = 14, frameon = False)
     # # Create a legend using the first subplot
     # handles, labels = ax.get_legend_handles_labels()
 

@@ -1,4 +1,4 @@
-from BaseLearners import BaseTree
+from BaseLearners import BaseTree, BaseRF, BaseGBDT, BaseXGB
 from sklearn.tree import DecisionTreeRegressor
 from ExpPipeline import pipeline
 import numpy as np
@@ -13,10 +13,7 @@ logger = logging.getLogger(name = "VE")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        resultDir = sys.argv[1]
-    else:
-        resultDir = os.path.join(os.path.dirname(__file__), str(uuid4()))
+    resultDir = sys.argv[1]
 
     os.makedirs(resultDir, exist_ok = True)
     logger.setLevel(logging.DEBUG)
@@ -27,12 +24,16 @@ if __name__ == "__main__":
 
     rngEval = np.random.default_rng(seed = 777)
 
-    d = 1
+    d = 50
     meanX = np.linspace(1, 100, num = d)
-    noiseShape = 1.01
+    noiseShape = float(sys.argv[2])
+    
+    algo = sys.argv[3]
+    
+    logger.info(f"Pareto shape = {noiseShape}")
 
     def trueMapping(x: NDArray) -> float:
-        return float(x[0])
+        return np.mean(np.log(x + 1))
 
     def sampler(n: int, repIdx: int, rng: np.random.Generator) -> NDArray:
         XSample = rng.uniform(low = 0, high = 2 * meanX, size = (n, len(meanX)))
@@ -47,7 +48,16 @@ if __name__ == "__main__":
         YSample = np.asarray([[trueMapping(x)] for x in XSample])
         return np.hstack((YSample, XSample))
     
-    baseTree = BaseTree(minSplit=10, minLeaf=5)
+    if algo == "VE":
+        baseTree = BaseTree(minSplit=30, minLeaf=10)
+    elif algo == "RF":
+        baseTree = BaseRF(30, minSplit=30, minLeaf=10, subsampleRatio=0.1)
+    elif algo == "GBDT":
+        baseTree = BaseGBDT(300, minSplit=30, minLeaf=10, subsampleRatio=0.1)
+    elif algo == "XGB":
+        baseTree = BaseXGB(300, subsampleRatio=0.1)
+    else:
+        raise ValueError()
 
     evalSample = evalSampler(1000000)
     
@@ -61,12 +71,16 @@ if __name__ == "__main__":
     def loss(prediction: NDArray[np.float64], repIndex: int) -> float:
         return np.mean((prediction - evalSample[:, 0])**2)
 
-    sampleSizeList = [2**i for i in range(12, 13)]
+    sampleSizeList = [2**i for i in range(11, 16, 2)]
     kList = []
     BList = []
-    k12List = [((30, 0.5), (30, 0.005))]
-    B12List = [(50, 200)]
-    numReplicates = 100
+    if algo == "VE":
+        k12List = [((30, 0.1), (30, 0.005))]
+        B12List = [(30, 200)]
+    else:
+        k12List = []
+        B12List = []
+    numReplicates = 200
 
     
     pipeline(resultDir,
@@ -84,4 +98,4 @@ if __name__ == "__main__":
              numParallelLearn = 1, 
              numParallelEval = 1,
              dumpSubsampleResults = True,
-             runConventionalBagging = True)
+             runConventionalBagging = False)
